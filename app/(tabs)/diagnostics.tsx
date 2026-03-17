@@ -29,19 +29,47 @@ export default function DiagnosticsScreen() {
       const response = await fetch(`http://${ESP32_IP}/scan_dtc`);
       const data = await response.json();
 
+      // Bersihkan spasi dari balasan ECU agar mudah dibaca sistem
+      const raw = data.raw_dtc
+        ? data.raw_dtc.toUpperCase().replace(/\s/g, "")
+        : "";
+
+      // Logika Pintar Paham Bahasa ECU Nissan
       if (
-        data.raw_dtc &&
-        data.raw_dtc.length > 4 &&
-        !data.raw_dtc.includes("NODATA")
+        raw.includes("NODATA") ||
+        raw.includes("ERROR") ||
+        raw === "" ||
+        raw === "OK" ||
+        raw === "?"
       ) {
-        setDtcList([{ code: "RAW HEX", desc: data.raw_dtc }]);
-        showAlert(
-          "KODE ERROR DITEMUKAN",
-          "ECU mendeteksi adanya malfungsi. Cek daftar DTC.",
-          "error",
-        );
+        setHasScanned(true); // Aman
+      } else if (raw.startsWith("5802")) {
+        // 5802 adalah header jawaban normal dari request 1802 di Nissan Livina
+        if (raw === "58020000" || raw === "5802") {
+          setHasScanned(true);
+        } else {
+          // Kalau ada penyakit, balasannya seperti "58020118" dsb.
+          setDtcList([{ code: "RAW HEX", desc: raw }]);
+          setHasScanned(true); // <--- KUNCI AGAR LAYAR TIDAK BLANK
+          showAlert(
+            "KODE ERROR DITEMUKAN",
+            "ECU mendeteksi adanya malfungsi. Cek daftar DTC.",
+            "error",
+          );
+        }
       } else {
-        setHasScanned(true);
+        // Jaga-jaga kalau ada balasan format lain yang aneh
+        if (raw.length > 4) {
+          setDtcList([{ code: "RAW HEX", desc: raw }]);
+          setHasScanned(true); // <--- KUNCI AGAR LAYAR TIDAK BLANK
+          showAlert(
+            "KODE ERROR DITEMUKAN",
+            "ECU mendeteksi adanya malfungsi. Cek daftar DTC.",
+            "error",
+          );
+        } else {
+          setHasScanned(true);
+        }
       }
     } catch (error) {
       showAlert(

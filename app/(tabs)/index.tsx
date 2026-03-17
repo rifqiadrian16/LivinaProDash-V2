@@ -232,7 +232,7 @@ export default function DashboardScreen() {
   const [carData, setCarData] = useState({
     speed: 0,
     rpm: 0,
-    temp: 0, // Engine Coolant Temp
+    temp: 0,
     volt: 0.0,
     locked: false,
     obd_connected: false,
@@ -240,11 +240,11 @@ export default function DashboardScreen() {
     throttle: 0,
     avgFuel: 0.0,
     instFuel: 0.0,
-    iat: 0, // Intake Air Temp
-    maf: 0.0, // Mass Air Flow
-    stft: 0.0, // Short Term Fuel Trim
-    ltft: 0.0, // Long Term Fuel Trim
-    timing: 0, // Timing Advance
+    iat: 0,
+    maf: 0.0,
+    stft: 0.0,
+    ltft: 0.0,
+    timing: 0,
   });
 
   const ESP32_IP = "172.18.167.81";
@@ -254,6 +254,11 @@ export default function DashboardScreen() {
   const tripDataRef = useRef<any[]>([]);
   const latestLocation = useRef<any>(null);
   const runningStats = useRef({ distance: 0, fuel: 0, startTime: 0 });
+  const sessionStats = useRef({ distance: 0, fuel: 0 });
+
+  const currentTripId = useRef("");
+  const lastSaveTime = useRef(0);
+  const lastUpdateTime = useRef(Date.now()); // Menambahkan pelacak waktu akurat
 
   useEffect(() => {
     (async () => {
@@ -286,6 +291,11 @@ export default function DashboardScreen() {
       // MULAI MEREKAM
       tripDataRef.current = [];
       runningStats.current = { distance: 0, fuel: 0, startTime: Date.now() };
+
+      // Set ID Trip dan Waktu Awal untuk Auto-Save
+      currentTripId.current = Date.now().toString();
+      lastSaveTime.current = Date.now();
+
       setIsRecording(true);
       isRecordingRef.current = true;
       showAlert(
@@ -294,20 +304,17 @@ export default function DashboardScreen() {
         "success",
       );
     } else {
-      // BERHENTI MEREKAM & SIMPAN
+      // BERHENTI MEREKAM & SIMPAN FINAL
       setIsRecording(false);
       isRecordingRef.current = false;
-      await saveTripData();
+      await saveTripData(true); // Parameter 'true' berarti ini simpanan terakhir (Final)
     }
   };
 
-  const saveTripData = async () => {
+  const saveTripData = async (isFinal = false) => {
     if (tripDataRef.current.length < 5) {
-      showAlert(
-        "TERLALU PENDEK",
-        "Perjalanan terlalu singkat untuk disimpan.",
-        "error",
-      );
+      if (isFinal)
+        showAlert("TERLALU PENDEK", "Perjalanan terlalu singkat.", "error");
       return;
     }
 
@@ -318,14 +325,14 @@ export default function DashboardScreen() {
     const durationMin = Math.round(durationMs / 60000);
 
     const newTrip = {
-      id: Date.now().toString(),
+      id: currentTripId.current, // <-- Selalu gunakan ID yang sama selama jalan
       date: new Date().toLocaleDateString("id-ID", {
         day: "numeric",
         month: "short",
         year: "numeric",
       }),
       route: `Livina Drive (${durationMin} Min)`,
-      ecoScore: maxRpm > 4000 || topSpeed > 100 ? 65 : 92, // Logika Eco Score Sederhana
+      ecoScore: maxRpm > 4000 || topSpeed > 100 ? 65 : 92,
       distance: runningStats.current.distance.toFixed(1),
       time: durationMin + "m",
       fuel: runningStats.current.fuel.toFixed(1) + " L",
@@ -335,23 +342,32 @@ export default function DashboardScreen() {
         fuelUsed: runningStats.current.fuel.toFixed(1) + " L",
         cost:
           "Rp " +
-          Math.round(runningStats.current.fuel * 10000).toLocaleString("id-ID"), // Asumsi Pertalite
+          Math.round(runningStats.current.fuel * 10000).toLocaleString("id-ID"),
       },
       routeData: routeData,
     };
 
     try {
       const existing = await AsyncStorage.getItem("@livina_trips");
-      const parsed = existing ? JSON.parse(existing) : [];
-      parsed.unshift(newTrip); // Masukkan di urutan paling atas
+      let parsed = existing ? JSON.parse(existing) : [];
+
+      // HAPUS DRAFT SEBELUMNYA (Agar tidak terjadi data ganda di Trip Logs)
+      parsed = parsed.filter((t: any) => t.id !== currentTripId.current);
+
+      // Masukkan data terbaru ke posisi paling atas
+      parsed.unshift(newTrip);
       await AsyncStorage.setItem("@livina_trips", JSON.stringify(parsed));
-      showAlert(
-        "TRIP TERSIMPAN",
-        "Data perjalanan berhasil dikirim ke Trip Logs.",
-        "success",
-      );
+
+      // Hanya munculkan notifikasi hijau jika ini tombol STOP dipencet
+      if (isFinal) {
+        showAlert(
+          "TRIP TERSIMPAN",
+          "Data perjalanan berhasil dikirim ke Trip Logs.",
+          "success",
+        );
+      }
     } catch (e) {
-      showAlert("ERROR", "Gagal menyimpan perjalanan.", "error");
+      if (isFinal) showAlert("ERROR", "Gagal menyimpan perjalanan.", "error");
     }
   };
 
@@ -378,10 +394,58 @@ export default function DashboardScreen() {
   };
 
   useEffect(() => {
+    // Reset timer saat komponen dimuat
+    lastUpdateTime.current = Date.now();
+
     const interval = setInterval(async () => {
       try {
         const response = await fetch(`http://${ESP32_IP}/data`);
         const data = await response.json();
+
+        // 1. HITUNG WAKTU NYATA (REAL DELTA TIME)
+        const now = Date.now();
+        const elapsedMs = now - lastUpdateTime.current;
+        lastUpdateTime.current = now;
+
+        // Cegah anomali jika HP nge-freeze/lag terlalu lama (maksimal anggap 1 detik)
+        const validElapsedMs = elapsedMs > 1000 ? 500 : elapsedMs;
+        const dt = validElapsedMs / 3600000; // Konversi milidetik ke Jam
+
+        // 2. RUMUS MAF KE LITER YANG LEBIH PRESISI DENGAN KALIBRASI
+        const currentSpeed = data.speed || 0;
+
+        // --- FAKTOR KALIBRASI BENSIN ---
+        // Jika aslinya lebih boros dari aplikasi, naikkan angka ini (misal 1.40)
+        // Jika aslinya lebih irit dari aplikasi, turunkan angka ini (misal 1.20)
+        const FUEL_CORRECTION = 1.3;
+
+        // Koreksi dinamis dari LTFT (Long Term Fuel Trim) ECU mobil
+        const trimCorrection = 1 + (data.ltft || 0) / 100;
+
+        // Rumus Final
+        const fuelFlowLph =
+          (data.maf || 0) * 0.3355 * FUEL_CORRECTION * trimCorrection;
+
+        // 3. TABUNG DATA (Hanya jika mesin menyala/MAF terbaca)
+        if (data.maf > 0) {
+          sessionStats.current.distance += currentSpeed * dt;
+          sessionStats.current.fuel += fuelFlowLph * dt;
+        }
+
+        // 4. KALKULASI INST & AVG
+        const liveInstFuel =
+          currentSpeed > 0 && fuelFlowLph > 0
+            ? parseFloat((currentSpeed / fuelFlowLph).toFixed(1))
+            : 0;
+
+        const liveAvgFuel =
+          sessionStats.current.fuel > 0.005
+            ? parseFloat(
+                (
+                  sessionStats.current.distance / sessionStats.current.fuel
+                ).toFixed(1),
+              )
+            : 0;
 
         setCarData((prev) => ({
           ...prev,
@@ -398,18 +462,11 @@ export default function DashboardScreen() {
           locked: data.locked,
           obd_connected: data.obd_connected,
           manual_disconnect: data.manual_disconnect,
-          // Rumus instFuel (Konsumsi BBM Instan) sementara berbasis estimasi MAF & Speed
-          instFuel:
-            data.speed > 0
-              ? parseFloat((data.speed / (data.maf * 0.3)).toFixed(1))
-              : 0,
+          instFuel: liveInstFuel,
+          avgFuel: liveAvgFuel,
         }));
 
         if (isRecordingRef.current && latestLocation.current) {
-          const dt = 0.5 / 3600; // 500ms dalam satuan Jam
-          const currentSpeed = data.speed || 0;
-          const fuelFlowLph = (data.maf || 0) * 0.3;
-
           runningStats.current.distance += currentSpeed * dt;
           runningStats.current.fuel += fuelFlowLph * dt;
 
@@ -422,11 +479,11 @@ export default function DashboardScreen() {
             iat: data.iat,
             maf: data.maf,
             stft: data.stft,
+            ltft: data.ltft,
             timing: data.timing,
-            instFuel:
-              data.speed > 0
-                ? parseFloat((data.speed / fuelFlowLph).toFixed(1))
-                : 0,
+            volt: data.volt,
+            throttle: data.throttle,
+            instFuel: liveInstFuel,
             time: new Date().toLocaleTimeString("id-ID", {
               hour: "2-digit",
               minute: "2-digit",
@@ -438,6 +495,11 @@ export default function DashboardScreen() {
                   ? "Aggressive Acceleration"
                   : "Cruising",
           });
+
+          if (Date.now() - lastSaveTime.current > 60000) {
+            lastSaveTime.current = Date.now(); // Reset timer
+            saveTripData(false); // Simpan senyap (tanpa notifikasi) ke storage HP
+          }
         }
       } catch {
         setCarData((prev) => ({ ...prev, obd_connected: false }));

@@ -134,20 +134,16 @@ export default function TripScreen() {
     }
 
     try {
-      // Header CSV untuk telemetri mentah (per detik/log)
       let csvString =
-        "Time,Latitude,Longitude,Speed (km/h),RPM,Coolant Temp (C),IAT (C),MAF (g/s),STFT (%),Timing (deg),Inst Fuel (km/L),Note\n";
+        "Time,Latitude,Longitude,Speed (km/h),RPM,Coolant Temp (C),IAT (C),MAF (g/s),STFT (%),LTFT (%),Timing (deg),Volt (V),Throttle (%),Inst Fuel (km/L),Note\n";
 
-      // Looping SEMUA data rekaman di dalam perjalanan yang dipilih
       trip.routeData.forEach((data: any) => {
-        // Membersihkan koma agar format CSV tidak rusak
         const safeTime = data.time ? String(data.time).replace(/,/g, " ") : "";
         const safeNote = data.note ? String(data.note).replace(/,/g, " ") : "";
 
-        csvString += `${safeTime},${data.latitude},${data.longitude},${data.speed},${data.rpm},${data.temp},${data.iat},${data.maf},${data.stft},${data.timing},${data.instFuel},${safeNote}\n`;
+        csvString += `${safeTime},${data.latitude},${data.longitude},${data.speed},${data.rpm},${data.temp},${data.iat},${data.maf},${data.stft},${data.ltft || 0},${data.timing},${data.volt || 0},${data.throttle || 0},${data.instFuel},${safeNote}\n`;
       });
 
-      // Nama file dibuat dinamis berdasarkan tanggal
       const safeDateName = trip.date.replace(/ /g, "_").replace(/,/g, "");
       // @ts-ignore
       const fileUri =
