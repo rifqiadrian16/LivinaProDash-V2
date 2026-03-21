@@ -247,7 +247,7 @@ export default function DashboardScreen() {
     timing: 0,
   });
 
-  const ESP32_IP = "172.18.167.81";
+  const espIpRef = useRef("192.168.4.1");
 
   const [isRecording, setIsRecording] = useState(false);
   const isRecordingRef = useRef(false); // Agar bisa dibaca di dalam setInterval
@@ -261,6 +261,36 @@ export default function DashboardScreen() {
   const lastUpdateTime = useRef(Date.now()); // Menambahkan pelacak waktu akurat
 
   useEffect(() => {
+    const discoverIp = async () => {
+      try {
+        // 1. Ambil IP terakhir dari memori HP
+        const savedIp = await AsyncStorage.getItem("@esp_ip");
+        if (savedIp) espIpRef.current = savedIp;
+
+        // 2. Lacak IP baru dari Cloud Server
+        const res = await fetch(
+          "https://dweet.io/get/latest/dweet/for/livinaprodash_iqi",
+        );
+        const data = await res.json();
+
+        if (data && data.with && data.with.length > 0) {
+          const latestIp = data.with[0].content.ip;
+          if (latestIp && latestIp !== espIpRef.current) {
+            espIpRef.current = latestIp;
+            await AsyncStorage.setItem("@esp_ip", latestIp);
+            showAlert(
+              "IP DIPERBARUI",
+              "ESP32 ditemukan di: " + latestIp,
+              "success",
+            );
+          }
+        }
+      } catch (error) {
+        // Abaikan jika tidak ada sinyal internet, pakai IP terakhir
+      }
+    };
+    discoverIp();
+
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
@@ -373,7 +403,7 @@ export default function DashboardScreen() {
 
   const handleConnect = async () => {
     try {
-      await fetch(`http://${ESP32_IP}/obd_connect`);
+      await fetch(`http://${espIpRef.current}/obd_connect`);
       showAlert("BERHASIL", "Perintah koneksi ECU telah dikirim.", "success");
     } catch (error) {
       showAlert(
@@ -386,7 +416,7 @@ export default function DashboardScreen() {
 
   const handleDisconnect = async () => {
     try {
-      await fetch(`http://${ESP32_IP}/obd_disconnect`);
+      await fetch(`http://${espIpRef.current}/obd_disconnect`);
       showAlert("TERPUTUS", "Koneksi ke ECU diputus secara manual.", "success");
     } catch (error) {
       showAlert("GAGAL", "ESP32 tidak merespon perintah disconnect.", "error");
@@ -399,7 +429,7 @@ export default function DashboardScreen() {
 
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`http://${ESP32_IP}/data`);
+        const response = await fetch(`http://${espIpRef.current}/data`);
         const data = await response.json();
 
         // 1. HITUNG WAKTU NYATA (REAL DELTA TIME)

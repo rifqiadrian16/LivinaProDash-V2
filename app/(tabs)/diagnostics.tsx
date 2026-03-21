@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -18,7 +19,15 @@ export default function DiagnosticsScreen() {
   const [dtcList, setDtcList] = useState<{ code: string; desc: string }[]>([]);
   const insets = useSafeAreaInsets();
 
-  const ESP32_IP = "172.18.167.81";
+  const espIpRef = useRef("192.168.4.1");
+
+  useEffect(() => {
+    const loadIp = async () => {
+      const savedIp = await AsyncStorage.getItem("@esp_ip");
+      if (savedIp) espIpRef.current = savedIp;
+    };
+    loadIp();
+  }, []);
 
   const startScan = async () => {
     setIsScanning(true);
@@ -26,7 +35,7 @@ export default function DiagnosticsScreen() {
     setDtcList([]);
 
     try {
-      const response = await fetch(`http://${ESP32_IP}/scan_dtc`);
+      const response = await fetch(`http://${espIpRef.current}/scan_dtc`);
       const data = await response.json();
 
       // Bersihkan spasi dari balasan ECU agar mudah dibaca sistem
@@ -85,7 +94,7 @@ export default function DiagnosticsScreen() {
   const clearDtc = async () => {
     setIsScanning(true);
     try {
-      await fetch(`http://${ESP32_IP}/clear_dtc`);
+      await fetch(`http://${espIpRef.current}/clear_dtc`);
       setDtcList([]);
       showAlert(
         "BERHASIL",
