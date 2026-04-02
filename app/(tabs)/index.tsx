@@ -263,18 +263,22 @@ export default function DashboardScreen() {
   useEffect(() => {
     const discoverIp = async () => {
       try {
-        // 1. Ambil IP terakhir dari memori HP
+        // 1. Ambil IP terakhir dari memori HP agar bisa langsung dipakai saat offline
         const savedIp = await AsyncStorage.getItem("@esp_ip");
         if (savedIp) espIpRef.current = savedIp;
 
-        // 2. Lacak IP baru dari Cloud Server
+        // 2. Lacak IP baru dari ThingSpeak (Pengganti Dweet)
+        const channelId = "3315537";
+        const readApiKey = "SFWGQAGKD1ETSAL9";
+
         const res = await fetch(
-          "https://dweet.io/get/latest/dweet/for/livinaprodash_iqi",
+          `https://api.thingspeak.com/channels/${channelId}/fields/1/last.json?api_key=${readApiKey}`,
         );
         const data = await res.json();
 
-        if (data && data.with && data.with.length > 0) {
-          const latestIp = data.with[0].content.ip;
+        if (data && data.field1) {
+          const latestIp = data.field1;
+
           if (latestIp && latestIp !== espIpRef.current) {
             espIpRef.current = latestIp;
             await AsyncStorage.setItem("@esp_ip", latestIp);
@@ -285,9 +289,7 @@ export default function DashboardScreen() {
             );
           }
         }
-      } catch (error) {
-        // Abaikan jika tidak ada sinyal internet, pakai IP terakhir
-      }
+      } catch (error) {}
     };
     discoverIp();
 
@@ -441,20 +443,51 @@ export default function DashboardScreen() {
         const validElapsedMs = elapsedMs > 1000 ? 500 : elapsedMs;
         const dt = validElapsedMs / 3600000; // Konversi milidetik ke Jam
 
-        // 2. RUMUS MAF KE LITER YANG LEBIH PRESISI DENGAN KALIBRASI
+        // 2. RUMUS MAF KE LITER YANG LEBIH PRESISI (LEVEL 2 + DFCO)
         const currentSpeed = data.speed || 0;
+        const currentRpm = data.rpm || 0;
+        const currentThrottle = data.throttle || 0;
+        const currentMaf = data.maf || 0;
+        const currentStft = data.stft || 0;
+        const currentLtft = data.ltft || 0;
 
-        // --- FAKTOR KALIBRASI BENSIN ---
-        // Jika aslinya lebih boros dari aplikasi, naikkan angka ini (misal 1.40)
-        // Jika aslinya lebih irit dari aplikasi, turunkan angka ini (misal 1.20)
+        // Konstanta Kalibrasi
         const FUEL_CORRECTION = 1.3;
+        const IDLE_THROTTLE = 18;
 
-        // Koreksi dinamis dari LTFT (Long Term Fuel Trim) ECU mobil
-        const trimCorrection = 1 + (data.ltft || 0) / 100;
+        let liveInstFuel = 0.0;
+        let fuelFlowLph = 0.0;
 
-        // Rumus Final
-        const fuelFlowLph =
-          (data.maf || 0) * 0.3355 * FUEL_CORRECTION * trimCorrection;
+        // A. KONDISI BERHENTI (Mobil diam di lampu merah / parkir)
+        if (currentSpeed === 0) {
+          liveInstFuel = 0.0;
+          // Tetap hitung bensin yang terbuang sia-sia saat idle
+          let trimCorrection = 1.0 + (currentStft + currentLtft) / 100.0;
+          if (trimCorrection < 0.5) trimCorrection = 0.5;
+          fuelFlowLph = currentMaf * 0.3355 * FUEL_CORRECTION * trimCorrection;
+        }
+        // B. KONDISI DFCO (Engine Braking / Lepas Gas Total di Tol)
+        else if (
+          currentThrottle <= IDLE_THROTTLE &&
+          currentRpm > 1200 &&
+          currentSpeed > 20
+        ) {
+          liveInstFuel = 99.9; // Tampilan mentok sangat irit
+          fuelFlowLph = 0.0; // ECU mematikan injektor, bensin 0 liter/jam
+        }
+        // C. KONDISI DINAMIS (Gaspol, Feathering, atau Jalan Normal)
+        else if (currentMaf > 0) {
+          // Gabungkan STFT dan LTFT untuk mengetahui persis berapa banyak ECU menyemprot bensin
+          let trimCorrection = 1.0 + (currentStft + currentLtft) / 100.0;
+          if (trimCorrection < 0.5) trimCorrection = 0.5; // Cegah error minus
+
+          fuelFlowLph = currentMaf * 0.3355 * FUEL_CORRECTION * trimCorrection;
+
+          if (fuelFlowLph > 0) {
+            liveInstFuel = parseFloat((currentSpeed / fuelFlowLph).toFixed(1));
+          }
+          if (liveInstFuel > 99.9) liveInstFuel = 99.9; // Batas maksimal tampilan
+        }
 
         // 3. TABUNG DATA (Hanya jika mesin menyala/MAF terbaca)
         if (data.maf > 0) {
@@ -462,12 +495,7 @@ export default function DashboardScreen() {
           sessionStats.current.fuel += fuelFlowLph * dt;
         }
 
-        // 4. KALKULASI INST & AVG
-        const liveInstFuel =
-          currentSpeed > 0 && fuelFlowLph > 0
-            ? parseFloat((currentSpeed / fuelFlowLph).toFixed(1))
-            : 0;
-
+        // 4. KALKULASI AVG FUEL SAJA (Inst Fuel sudah dihitung di atas)
         const liveAvgFuel =
           sessionStats.current.fuel > 0.005
             ? parseFloat(

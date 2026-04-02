@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import React, { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -21,13 +22,17 @@ export default function DiagnosticsScreen() {
 
   const espIpRef = useRef("192.168.4.1");
 
-  useEffect(() => {
-    const loadIp = async () => {
-      const savedIp = await AsyncStorage.getItem("@esp_ip");
-      if (savedIp) espIpRef.current = savedIp;
-    };
-    loadIp();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      const loadIp = async () => {
+        const savedIp = await AsyncStorage.getItem("@esp_ip");
+        if (savedIp) {
+          espIpRef.current = savedIp;
+        }
+      };
+      loadIp();
+    }, []),
+  );
 
   const startScan = async () => {
     setIsScanning(true);
