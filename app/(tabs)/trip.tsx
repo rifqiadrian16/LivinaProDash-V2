@@ -2,8 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Slider from "@react-native-community/slider";
 import * as FileSystem from "expo-file-system/legacy";
+import { useFocusEffect } from "expo-router";
 import * as Sharing from "expo-sharing";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -219,9 +220,11 @@ export default function TripScreen() {
   }, [tripHistory]);
 
   // Otomatis sync saat layar Trip dibuka
-  useEffect(() => {
-    syncTrips();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      syncTrips();
+    }, []),
+  );
 
   useEffect(() => {
     let interval: any;

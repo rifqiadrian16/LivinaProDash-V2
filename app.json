@@ -2,7 +2,7 @@
   "expo": {
     "name": "LivinaProDash",
     "slug": "LivinaProDash",
-    "version": "1.2.2",
+    "version": "2.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/livina.png",
     "scheme": "livinaprodash",
@@ -18,7 +18,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.rifqi.adrian16.LivinaProDash",
+      "package": "com.Livina.Prodash",
+      "versionCode": 2,
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCRGJYfEeEfYXhxbmhUGTLGySpd57H5qPw"
@@ -31,6 +32,14 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "@config-plugins/react-native-ble-plx",
+        {
+          "isBackgroundEnabled": true,
+          "modes": ["peripheral", "central"],
+          "bluetoothAlwaysPermission": "Izinkan Livina ProDash terhubung ke modul ESP32 mobil Anda."
+        }
+      ],
       [
         "expo-splash-screen",
         {

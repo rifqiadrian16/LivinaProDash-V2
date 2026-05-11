@@ -1,9 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import React from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AlertProvider } from "../../components/AlertContext";
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <AlertProvider>
       <Tabs
@@ -15,8 +18,8 @@ export default function TabLayout() {
             backgroundColor: "#121212",
             borderTopColor: "#333",
             borderTopWidth: 2,
-            paddingBottom: 5,
-            height: 60,
+            paddingBottom: insets.bottom > 0 ? insets.bottom : 5,
+            height: 60 + (insets.bottom > 0 ? insets.bottom - 10 : 0),
           },
         }}
       >
