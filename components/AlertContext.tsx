@@ -44,7 +44,7 @@ export const AlertProvider = ({ children }: { children: React.ReactNode }) => {
               styles.alertBox,
               {
                 borderTopColor:
-                  alertConfig.type === "success" ? "#00cc00" : "#ff4444",
+                  alertConfig.type === "success" ? "#00ff88" : "#ff4444",
               },
             ]}
           >
@@ -53,7 +53,7 @@ export const AlertProvider = ({ children }: { children: React.ReactNode }) => {
                 alertConfig.type === "success" ? "checkmark-circle" : "warning"
               }
               size={56}
-              color={alertConfig.type === "success" ? "#00cc00" : "#ff4444"}
+              color={alertConfig.type === "success" ? "#00ff88" : "#ff4444"}
             />
             <Text style={styles.alertTitle}>{alertConfig.title}</Text>
             <Text style={styles.alertMessage}>{alertConfig.message}</Text>
@@ -63,7 +63,7 @@ export const AlertProvider = ({ children }: { children: React.ReactNode }) => {
                 styles.alertBtn,
                 {
                   backgroundColor:
-                    alertConfig.type === "success" ? "#00cc00" : "#ff4444",
+                    alertConfig.type === "success" ? "#00ff88" : "#ff4444",
                 },
               ]}
               onPress={hideAlert}

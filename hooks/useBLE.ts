@@ -218,25 +218,40 @@ export default function useBLE(
       console.log("[BLE] Status Hardware Bluetooth:", btState);
 
       if (btState === "PoweredOff") {
-        if (Platform.OS === "android") {
-          try {
-            console.log("[BLE] Meminta sistem menyalakan Bluetooth...");
-            // 🌟 Memicu Pop-Up Sistem Bawaan Android "Turn on Bluetooth?"
-            await bleManager.enable();
-            console.log("[BLE] Bluetooth berhasil dinyalakan oleh user!");
-            return true; // Lanjut konek
-          } catch (error) {
-            console.log("[BLE] User MENOLAK menyalakan Bluetooth:", error);
-            return false; // Berhenti konek karena user menolak nyalain BT
-          }
-        } else {
-          Alert.alert(
-            "Bluetooth Mati ⚠️",
-            "Livina ProDash butuh koneksi Bluetooth untuk membaca data mesin.\n\nSilakan buka Control Center (usap layar) atau Pengaturan iOS untuk menyalakan Bluetooth.",
-          );
-          console.log("[BLE] iOS: Bluetooth mati.");
-          return false;
-        }
+        // Tampilkan Alert Paksa untuk Android & iOS
+        Alert.alert(
+          "Bluetooth Mati ⚠️",
+          "Livina ProDash membutuhkan koneksi Bluetooth untuk membaca data mesin.\n\nSilakan nyalakan Bluetooth Anda terlebih dahulu.",
+          [
+            {
+              text: "Tutup",
+              style: "cancel",
+            },
+            {
+              text: "Coba Nyalakan (Android)",
+              onPress: async () => {
+                if (Platform.OS === "android") {
+                  try {
+                    console.log("[BLE] Meminta sistem menyalakan Bluetooth...");
+                    await bleManager.enable();
+                  } catch (error) {
+                    console.log(
+                      "[BLE] Sistem menolak menyalakan otomatis:",
+                      error,
+                    );
+                    Alert.alert(
+                      "Gagal",
+                      "Silakan usap layar ke bawah dan nyalakan Bluetooth secara manual melalui Control Center.",
+                    );
+                  }
+                }
+              },
+            },
+          ],
+        );
+
+        // Kembalikan false agar loading di layar awal langsung berhenti
+        return false;
       }
     }
 
