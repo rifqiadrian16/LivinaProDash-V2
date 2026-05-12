@@ -1,6 +1,6 @@
 import { Buffer } from "buffer";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PermissionsAndroid, Platform } from "react-native";
+import { Alert, PermissionsAndroid, Platform } from "react-native";
 import {
   BleError,
   Characteristic,
@@ -189,22 +189,58 @@ export default function useBLE(
       return false;
     }
 
+    let permissionsGranted = true;
+
+    // 1. CEK IZIN APLIKASI (Android 12+)
     if (Platform.OS === "android") {
       const granted = await PermissionsAndroid.requestMultiple([
         PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
         PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
       ]);
-      return (
+      permissionsGranted =
         granted["android.permission.BLUETOOTH_CONNECT"] ===
           PermissionsAndroid.RESULTS.GRANTED &&
         granted["android.permission.BLUETOOTH_SCAN"] ===
           PermissionsAndroid.RESULTS.GRANTED &&
         granted["android.permission.ACCESS_FINE_LOCATION"] ===
-          PermissionsAndroid.RESULTS.GRANTED
-      );
+          PermissionsAndroid.RESULTS.GRANTED;
     }
-    return true;
+
+    if (!permissionsGranted) {
+      console.log("[BLE] Izin aplikasi DITOLAK user.");
+      return false; // Berhenti kalau izin belum dikasih
+    }
+
+    // 2. CEK STATUS HARDWARE BLUETOOTH (NYALA / MATI)
+    if (bleManager) {
+      const btState = await bleManager.state();
+      console.log("[BLE] Status Hardware Bluetooth:", btState);
+
+      if (btState === "PoweredOff") {
+        if (Platform.OS === "android") {
+          try {
+            console.log("[BLE] Meminta sistem menyalakan Bluetooth...");
+            // 🌟 Memicu Pop-Up Sistem Bawaan Android "Turn on Bluetooth?"
+            await bleManager.enable();
+            console.log("[BLE] Bluetooth berhasil dinyalakan oleh user!");
+            return true; // Lanjut konek
+          } catch (error) {
+            console.log("[BLE] User MENOLAK menyalakan Bluetooth:", error);
+            return false; // Berhenti konek karena user menolak nyalain BT
+          }
+        } else {
+          Alert.alert(
+            "Bluetooth Mati ⚠️",
+            "Livina ProDash butuh koneksi Bluetooth untuk membaca data mesin.\n\nSilakan buka Control Center (usap layar) atau Pengaturan iOS untuk menyalakan Bluetooth.",
+          );
+          console.log("[BLE] iOS: Bluetooth mati.");
+          return false;
+        }
+      }
+    }
+
+    return true; // Izin oke, Hardware nyala!
   };
 
   // Scan device BLE (cari "LivinaProDash")

@@ -9,7 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.Livina.Prodash",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,20 +28,31 @@
         "googleMaps": {
           "apiKey": "AIzaSyCRGJYfEeEfYXhxbmhUGTLGySpd57H5qPw"
         }
-      }
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT"
+      ]
     },
     "web": {
       "output": "static",
       "favicon": "./assets/images/livina.png"
     },
     "plugins": [
+      "expo-location",
       "expo-router",
       [
         "@config-plugins/react-native-ble-plx",
         {
           "isBackgroundEnabled": true,
-          "modes": ["peripheral", "central"],
-          "bluetoothAlwaysPermission": "Izinkan Livina ProDash terhubung ke modul ESP32 mobil Anda."
+          "modes": [
+            "peripheral",
+            "central"
+          ],
+          "bluetoothAlwaysPermission": "Livina ProDash butuh akses Bluetooth untuk terhubung dan membaca data dari Modul ECU/OBD2 Mobil Anda."
         }
       ],
       [
