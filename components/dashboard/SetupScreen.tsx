@@ -19,9 +19,7 @@ export default function SetupScreen({
             <Ionicons name="car-sport" size={80} color="#00ff88" />
           </TouchableOpacity>
           <Text style={styles.setupTitle}>LIVINA PRODASH</Text>
-          <Text style={styles.setupSubtitle}>
-            Sistem Telemetri & Diagnostik
-          </Text>
+          <Text style={styles.setupSubtitle}>Sistem Telemetri</Text>
         </View>
 
         <View

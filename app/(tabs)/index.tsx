@@ -1,6 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Animated, ScrollView, TouchableOpacity } from "react-native";
+import {
+  Animated,
+  ScrollView,
+  TouchableOpacity,
+  View
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // IMPORT CUSTOM HOOKS
@@ -35,6 +40,15 @@ export default function DashboardScreen() {
   // DASHBOARD UTAMA
   return (
     <SafeAreaView style={styles.safeArea}>
+      <View
+        style={{
+          position: "absolute",
+          top: 100,
+          left: 20,
+          zIndex: 999,
+          gap: 10,
+        }}
+      ></View>
       <ScrollView
         style={styles.container}
         contentContainerStyle={{ paddingBottom: 120 }}
@@ -129,7 +143,7 @@ export default function DashboardScreen() {
         setOtaSsid={actions.setOtaSsid}
         otaPass={state.otaPass}
         setOtaPass={actions.setOtaPass}
-        onEnterOTA={actions.enterOTAMode}
+        onEnterOta={actions.enterOTAMode}
       />
 
       {/* Settings Modal: Sekarang Radar Scanner-nya jalan lagi */}

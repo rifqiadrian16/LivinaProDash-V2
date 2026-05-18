@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import * as ExpoLocation from "expo-location";
 import * as NavigationBar from "expo-navigation-bar";
 import * as ScreenOrientation from "expo-screen-orientation";
@@ -45,7 +46,7 @@ export default function useDashboard() {
   });
   const [isRecording, setIsRecording] = useState(false);
   const [avgFuel, setAvgFuel] = useState(0);
-  const fuelHistoryRef = useRef<number[]>([]);
+  const sessionStats = useRef({ distance: 0, fuel: 0 });
   const tripDataRef = useRef<any[]>([]);
   const lastUpdateTime = useRef(Date.now());
   const lastSaveTime = useRef(0);
@@ -225,6 +226,7 @@ export default function useDashboard() {
 
   // --- BLE HANDLERS ---
   const handleRawText = (raw: string) => {
+    console.log("📨 [BALASAN ECU]:", raw);
     if (raw === "SCAN_STATUS:SCANNING") setIsSearchingOBD(true);
     else if (raw === "SCAN_STATUS:DONE") setIsSearchingOBD(false);
     else if (raw.startsWith("SCAN_FOUND:")) {
@@ -251,22 +253,44 @@ export default function useDashboard() {
   const updateData = (newData: any) => {
     setData(newData);
     const now = Date.now();
-    if (newData.m > 0 && newData.s > 2) {
-      const inst = (14.7 * 737 * newData.s) / (3600 * newData.m);
-      fuelHistoryRef.current = [...fuelHistoryRef.current, inst].slice(-100);
-      setAvgFuel(
-        fuelHistoryRef.current.reduce((a, b) => a + b, 0) /
-          fuelHistoryRef.current.length,
-      );
+    const dt = (now - lastUpdateTime.current) / 3600000; // Delta Time dalam Jam (h)
+    lastUpdateTime.current = now;
+
+    // --- 1. RUMUS FUEL FLOW (L/h) ---
+    // MAF * 0.3309 (Bensin RON 90-92, Stoich 14.7)
+    let fuelFlow = newData.m * 0.3309;
+
+    // --- 2. KOREKSI FUEL TRIMS ---
+    fuelFlow = fuelFlow * (1 + (newData.st + newData.lt) / 100);
+
+    // --- 3. DFCO (Deceleration Fuel Cut-Off) ---
+    // Kompensasi Absolute Throttle Nissan (Lepas gas biasanya 12-16%)
+    const isDFCO = newData.th < 18 && newData.s > 20 && newData.r > 1200;
+    if (isDFCO) {
+      fuelFlow = 0; // Injektor mati
     }
 
-    // LOGIC RECORDING YANG TADI KESUNAT KEMBALI LAGI
+    // --- 4. KALKULASI AVG FUEL (TOTAL DISTANCE / TOTAL FUEL) ---
+    if (dt > 0 && dt < 1) {
+      // Abaikan lonjakan waktu saat pertama connect
+      sessionStats.current.distance += newData.s * dt;
+      sessionStats.current.fuel += fuelFlow * dt;
+
+      if (sessionStats.current.fuel > 0) {
+        setAvgFuel(sessionStats.current.distance / sessionStats.current.fuel);
+      }
+    }
+
+    // --- 5. LOGIC RECORDING KE DALAM RIWAYAT PERJALANAN ---
     if (isRecordingRef.current) {
-      const dt = (now - lastUpdateTime.current) / 3600000;
-      lastUpdateTime.current = now;
-      const fuelFlowLph = newData.m * 0.3355 * 1.3;
       runningStats.current.distance += newData.s * dt;
-      runningStats.current.fuel += fuelFlowLph * dt;
+      runningStats.current.fuel += fuelFlow * dt;
+
+      // Hitung Inst Fuel khusus untuk rekaman CSV
+      let recInst = 0.0;
+      if (isDFCO) recInst = 99.9;
+      else if (newData.s > 2 && fuelFlow > 0)
+        recInst = Math.min(newData.s / fuelFlow, 99.9);
 
       tripDataRef.current.push({
         latitude: latestLocation.current?.latitude || 0,
@@ -281,22 +305,21 @@ export default function useDashboard() {
         timing: newData.tm,
         volt: newData.v,
         throttle: newData.th,
-        instFuel:
-          newData.m > 0 && newData.s > 2
-            ? (14.7 * 737 * newData.s) / (3600 * newData.m)
-            : 0,
+        instFuel: recInst.toFixed(1), // Simpan nilai Inst Fuel akurat
         time: new Date().toLocaleTimeString("id-ID", {
           hour: "2-digit",
           minute: "2-digit",
         }),
-        note:
-          newData.s > 80
+        note: isDFCO
+          ? "DFCO Active (Fuel Cut)"
+          : newData.s > 80
             ? "High Speed"
             : newData.r > 3500
               ? "Aggressive"
               : "Cruising",
       });
 
+      // (Logic buffer 500 dan autosave tetap aman di bawah sini...)
       if (tripDataRef.current.length > 500) {
         const overflow = tripDataRef.current.splice(
           0,
@@ -420,6 +443,7 @@ export default function useDashboard() {
     );
     await NavigationBar.setVisibilityAsync("hidden");
     RNStatusBar.setHidden(true, "none");
+    await activateKeepAwakeAsync();
     setIsHudMode(true);
   };
 
@@ -429,6 +453,7 @@ export default function useDashboard() {
     );
     await NavigationBar.setVisibilityAsync("visible");
     RNStatusBar.setHidden(false, "slide");
+    await deactivateKeepAwake();
     setIsHudMode(false);
   };
 
@@ -499,32 +524,51 @@ export default function useDashboard() {
       );
     await AsyncStorage.setItem("@ota_ssid", otaSsid);
     await AsyncStorage.setItem("@ota_pass", otaPass);
-    setConfirmAlert({
-      visible: true,
-      title: "Masuk Mode Update (OTA)?",
-      message: `Modul akan restart dan mencari Hotspot:\n"${otaSsid}"\n\nPastikan Hotspot menyala.`,
-      confirmText: "Ya, Masuk OTA",
-      cancelText: "Batal",
-      isDanger: false,
-      onConfirm: () => {
-        sendMessage(`WIFI_SSID:${otaSsid}`);
-        setTimeout(() => sendMessage(`WIFI_PASS:${otaPass}`), 300);
-        setTimeout(() => {
-          sendMessage("SET_MODE_0");
-          setShowSettings(false);
-          setConfirmAlert((prev) => ({ ...prev, visible: false }));
-          showAlert(
-            "Mode OTA Aktif",
-            `Nyalakan Hotspot "${otaSsid}" dan buka PlatformIO.`,
-            "success",
-          );
-        }, 600);
-      },
-    });
+
+    setShowOTAModal(false);
+
+    setTimeout(() => {
+      setConfirmAlert({
+        visible: true,
+        title: "Masuk Mode Update (OTA)?",
+        message: `Modul akan restart dan mencari Hotspot:\n"${otaSsid}"\n\nPastikan Hotspot menyala.`,
+        confirmText: "Ya, Masuk OTA",
+        cancelText: "Batal",
+        isDanger: false,
+        onConfirm: () => {
+          sendMessage(`WIFI_SSID:${otaSsid}`);
+          setTimeout(() => sendMessage(`WIFI_PASS:${otaPass}`), 300);
+          setTimeout(() => {
+            sendMessage("SET_MODE_0");
+
+            // 👇 3. Tutup Pop-Up Konfirmasinya
+            setConfirmAlert((prev) => ({ ...prev, visible: false }));
+
+            showAlert(
+              "Mode OTA Aktif",
+              `Nyalakan Hotspot "${otaSsid}" dan buka Aplikasi OTA.`,
+              "success",
+            );
+          }, 600);
+        },
+      });
+    }, 300);
   };
 
-  const instFuel =
-    data.m > 0 && data.s > 2 ? (14.7 * 737 * data.s) / (3600 * data.m) : 0;
+  let currentFuelFlow = data.m * 0.3309;
+  currentFuelFlow = currentFuelFlow * (1 + (data.st + data.lt) / 100);
+
+  const isDFCO = data.th < 23 && data.s > 20 && data.r > 1200;
+  if (isDFCO) currentFuelFlow = 0;
+
+  let instFuel = 0.0;
+  if (isDFCO) {
+    instFuel = 99.9; // Tampilkan angka mentok kalau DFCO (Injektor mati)
+  } else if (data.s > 2 && currentFuelFlow > 0) {
+    instFuel = Math.min(data.s / currentFuelFlow, 99.9); // Cap maksimal di 99.9 km/L
+  } else {
+    instFuel = 0.0; // Saat idle (speed <= 2)
+  }
 
   // --- KEMBALIKAN SEMUA STATE & ACTIONS KE INDEX.TSX ---
   return {
