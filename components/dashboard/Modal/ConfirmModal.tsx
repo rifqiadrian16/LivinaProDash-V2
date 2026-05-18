@@ -11,7 +11,7 @@ export default function ConfirmModal({ visible, config, onClose }: any) {
           style={[
             styles.modalBox,
             {
-              borderColor: config.isDanger ? "#ff4444" : "#3498db",
+              borderColor: config.isDanger ? "#ff4444" : "#00ff88",
               alignItems: "center",
               paddingVertical: 30,
               width: "80%",
@@ -21,7 +21,7 @@ export default function ConfirmModal({ visible, config, onClose }: any) {
           <Ionicons
             name={config.isDanger ? "warning" : "cloud-upload"}
             size={60}
-            color={config.isDanger ? "#ff4444" : "#3498db"}
+            color={config.isDanger ? "#ff4444" : "#00ff88"}
             style={{ marginBottom: 15 }}
           />
           <Text
@@ -57,7 +57,7 @@ export default function ConfirmModal({ visible, config, onClose }: any) {
                 styles.saveBtn,
                 {
                   flex: 1,
-                  backgroundColor: config.isDanger ? "#ff4444" : "#3498db",
+                  backgroundColor: config.isDanger ? "#ff4444" : "#00ff88",
                 },
               ]}
               onPress={config.onConfirm}

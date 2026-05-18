@@ -1,13 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Modal,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Modal,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { styles } from "../../../styles/dashboard.styles";
 
@@ -40,6 +40,14 @@ export default function SettingsModal({
   onSelectDevice,
   sendMessage,
 }: any) {
+  const [secretTapCount, setSecretTapCount] = useState(0);
+
+  useEffect(() => {
+    if (!visible) {
+      setSecretTapCount(0);
+    }
+  }, [visible]);
+
   return (
     <>
       {/* 1. MODAL UTAMA PENGATURAN */}
@@ -54,7 +62,13 @@ export default function SettingsModal({
                 marginBottom: 20,
               }}
             >
-              <Text style={styles.modalTitle}>Pengaturan Modul</Text>
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => setSecretTapCount((prev) => prev + 1)}
+              >
+                <Text style={styles.modalTitle}>Pengaturan Modul</Text>
+              </TouchableOpacity>
+
               <TouchableOpacity onPress={onClose}>
                 <Ionicons name="close" size={24} color="#888" />
               </TouchableOpacity>
@@ -274,6 +288,31 @@ export default function SettingsModal({
               <TouchableOpacity style={styles.saveBtn} onPress={onApply}>
                 <Text style={styles.saveBtnText}>TERAPKAN & RESTART MODUL</Text>
               </TouchableOpacity>
+
+              {secretTapCount >= 7 && (
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: "#c0392b",
+                    padding: 14,
+                    borderRadius: 8,
+                    marginTop: 20,
+                    alignItems: "center",
+                    borderWidth: 1,
+                    borderColor: "#e74c3c",
+                  }}
+                  onPress={() => {
+                    sendMessage("FACTORY_RESET");
+                    setSecretTapCount(0);
+                    onClose();
+                  }}
+                >
+                  <Text
+                    style={{ color: "#fff", fontWeight: "bold", fontSize: 14 }}
+                  >
+                    🚨 DEVELOPER MODE: FACTORY RESET MODUL
+                  </Text>
+                </TouchableOpacity>
+              )}
             </ScrollView>
           </View>
         </View>

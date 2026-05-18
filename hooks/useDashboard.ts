@@ -69,6 +69,9 @@ export default function useDashboard() {
   const [otaPass, setOtaPass] = useState("12345678");
   const [isConnectingBLE, setIsConnectingBLE] = useState(false);
   const connectingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [obdStatus, setObdStatus] = useState<
+    "disconnected" | "waiting_mac" | "connecting_ecu" | "ready"
+  >("disconnected");
 
   // --- 6. RADAR & ALERT STATE ---
   const [showScanner, setShowScanner] = useState(false);
@@ -227,7 +230,9 @@ export default function useDashboard() {
   // --- BLE HANDLERS ---
   const handleRawText = (raw: string) => {
     console.log("📨 [BALASAN ECU]:", raw);
-    if (raw === "SCAN_STATUS:SCANNING") setIsSearchingOBD(true);
+    if (raw === "STATUS:WAITING_MAC") {
+      setObdStatus("waiting_mac");
+    } else if (raw === "SCAN_STATUS:SCANNING") setIsSearchingOBD(true);
     else if (raw === "SCAN_STATUS:DONE") setIsSearchingOBD(false);
     else if (raw.startsWith("SCAN_FOUND:")) {
       const parts = raw.replace("SCAN_FOUND:", "").split("|");
@@ -252,20 +257,18 @@ export default function useDashboard() {
 
   const updateData = (newData: any) => {
     setData(newData);
+    if (newData.v > 0 || newData.r > 0) {
+      setObdStatus("ready");
+    }
+
     const now = Date.now();
-    const dt = (now - lastUpdateTime.current) / 3600000; // Delta Time dalam Jam (h)
+    const dt = (now - lastUpdateTime.current) / 3600000;
     lastUpdateTime.current = now;
 
-    // --- 1. RUMUS FUEL FLOW (L/h) ---
-    // MAF * 0.3309 (Bensin RON 90-92, Stoich 14.7)
     let fuelFlow = newData.m * 0.3309;
-
-    // --- 2. KOREKSI FUEL TRIMS ---
     fuelFlow = fuelFlow * (1 + (newData.st + newData.lt) / 100);
 
-    // --- 3. DFCO (Deceleration Fuel Cut-Off) ---
-    // Kompensasi Absolute Throttle Nissan (Lepas gas biasanya 12-16%)
-    const isDFCO = newData.th < 18 && newData.s > 20 && newData.r > 1200;
+    const isDFCO = newData.th < 20 && newData.s > 20 && newData.r > 1200;
     if (isDFCO) {
       fuelFlow = 0; // Injektor mati
     }
@@ -351,6 +354,7 @@ export default function useDashboard() {
   useEffect(() => {
     isConnectedRef.current = isConnected;
   }, [isConnected]);
+
   useEffect(() => {
     if (isConnected) {
       if (connectingTimerRef.current) {
@@ -374,6 +378,16 @@ export default function useDashboard() {
       return () => clearTimeout(timer);
     }
   }, [isConnected, isNightTime]);
+
+  useEffect(() => {
+    if (!isConnected) {
+      setObdStatus("disconnected");
+    } else {
+      setObdStatus((prev) =>
+        prev === "disconnected" ? "connecting_ecu" : prev,
+      );
+    }
+  }, [isConnected]);
 
   // --- ACTIONS ---
   const handleConnectToModule = async () => {
@@ -531,17 +545,16 @@ export default function useDashboard() {
       setConfirmAlert({
         visible: true,
         title: "Masuk Mode Update (OTA)?",
-        message: `Modul akan restart dan mencari Hotspot:\n"${otaSsid}"\n\nPastikan Hotspot menyala.`,
+        message: `Modul akan restart dan mencari Hotspot:\n"${otaSsid}"\n\nPastikan Hotspot HP Mas sudah aktif.`,
         confirmText: "Ya, Masuk OTA",
         cancelText: "Batal",
-        isDanger: false,
+        isDanger: true, // 👈 Kita set TRUE biar tombol konfirmasinya berwarna merah tegas, menandakan aksi restart!
         onConfirm: () => {
           sendMessage(`WIFI_SSID:${otaSsid}`);
           setTimeout(() => sendMessage(`WIFI_PASS:${otaPass}`), 300);
           setTimeout(() => {
             sendMessage("SET_MODE_0");
 
-            // 👇 3. Tutup Pop-Up Konfirmasinya
             setConfirmAlert((prev) => ({ ...prev, visible: false }));
 
             showAlert(
@@ -593,6 +606,7 @@ export default function useDashboard() {
       obdWifiSsid,
       obdIp,
       obdPort,
+      obdStatus,
       autoLock,
       lockSpeed,
       isConnectingBLE,
