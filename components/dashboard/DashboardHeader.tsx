@@ -9,6 +9,7 @@ export default function DashboardHeader({
   onEnterHud,
   onOpenSettings,
   onDisconnect,
+  isObdStandby,
 }: any) {
   return (
     <View style={styles.header}>
@@ -24,11 +25,12 @@ export default function DashboardHeader({
         <TouchableOpacity onPress={onOpenSettings} style={styles.iconBtn}>
           <Ionicons name="settings" size={18} color="#888" />
         </TouchableOpacity>
-        <TouchableOpacity
-          onPress={onDisconnect}
-          style={[styles.iconBtn, { borderColor: "#ff4444" }]}
-        >
-          <Ionicons name="power" size={18} color="#ff4444" />
+        <TouchableOpacity onPress={onDisconnect} style={styles.iconBtn}>
+          <Ionicons
+            name={isObdStandby ? "play-circle-outline" : "stop-circle-outline"}
+            size={24}
+            color={isObdStandby ? "#00ff88" : "#ff4444"}
+          />
         </TouchableOpacity>
         <View
           style={[

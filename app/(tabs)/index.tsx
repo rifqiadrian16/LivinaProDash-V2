@@ -11,10 +11,14 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import useDashboard from "../../hooks/useDashboard";
 
-// IMPORT COMPONENTS
+// IMPORT SUB-SCREENS
+import ConnectingEcuScreen from "../../components/dashboard/ConnectingEcuScreen";
 import DashboardHeader from "../../components/dashboard/DashboardHeader";
 import DataGrid from "../../components/dashboard/DataGrid";
 import MainGauges from "../../components/dashboard/MainGauges";
+import WaitingMacScreen from "../../components/dashboard/WaitingMacScreen";
+
+// IMPORT MODALS
 import ConfirmModal from "../../components/dashboard/Modal/ConfirmModal";
 import HudModal from "../../components/dashboard/Modal/HudModal";
 import OTAModal from "../../components/dashboard/Modal/OTAModal";
@@ -26,9 +30,9 @@ import { styles } from "../../styles/dashboard.styles";
 export default function DashboardScreen() {
   const { state, actions } = useDashboard();
 
-  // 🛡️ FUNGSI FILTER KONTEN UTAMA (SETUP WIZARD MANAGEMENT)
+  // 🛡️ GERBANG LOGIKA TAMPILAN DINAMIS
   const renderMainContent = () => {
-    // KONDISI DEMO / BYPASS / DATA READY: Tampilkan Dashboard Utama Mas!
+    // KONDISI UTAMA: Tampilkan Dashboard Aktif
     if (state.isBypassed || state.obdStatus === "ready") {
       return (
         <ScrollView
@@ -42,6 +46,7 @@ export default function DashboardScreen() {
             onEnterHud={actions.enterHudMode}
             onOpenSettings={() => actions.setShowSettings(true)}
             onDisconnect={actions.disconnectOBD}
+            isObdStandby={state.isObdStandby}
           />
           <MainGauges rpm={state.data.r} speed={state.data.s} />
           <DataGrid
@@ -53,7 +58,7 @@ export default function DashboardScreen() {
       );
     }
 
-    // TAHAP 1: Belum Konek BLE ke ESP32
+    // TAHAP 1: Belum Konek Bluetooth ke ESP32
     if (state.obdStatus === "disconnected") {
       return (
         <SetupScreen
@@ -64,108 +69,51 @@ export default function DashboardScreen() {
       );
     }
 
-    // TAHAP 2: Pembeli Baru (ESP32 teriak minta MAC OBD)
-    if (state.obdStatus === "waiting_mac") {
+    // TAHAP 1.5: Proses Jabat Tangan & Pengecekan Config Memori
+    if (state.obdStatus === "checking") {
       return (
         <View
           style={{
             flex: 1,
             justifyContent: "center",
             alignItems: "center",
-            padding: 25,
             backgroundColor: "#111",
           }}
         >
-          <Ionicons name="bluetooth-outline" size={90} color="#e67e22" />
-          <Text
-            style={{
-              color: "#fff",
-              fontSize: 22,
-              fontWeight: "bold",
-              marginTop: 25,
-              textAlign: "center",
-            }}
-          >
-            Konfigurasi OBD2 Pertama Kali
+          <ActivityIndicator size="large" color="#3498db" />
+          <Text style={{ color: "#fff", marginTop: 25, fontWeight: "bold" }}>
+            Memeriksa Memori Modul...
           </Text>
-          <Text
-            style={{
-              color: "#aaa",
-              textAlign: "center",
-              marginTop: 12,
-              marginBottom: 35,
-              lineHeight: 24,
-              paddingHorizontal: 15,
-            }}
-          >
-            Modul LivinaProDash berhasil tersambung ke HP Mas! Namun, modul
-            belum dipasangkan dengan adaptor OBD2 di mobil.
-          </Text>
-          <TouchableOpacity
-            style={[
-              styles.connectBtn,
-              { backgroundColor: "#e67e22", width: "85%" },
-            ]}
-            onPress={() => actions.setShowSettings(true)}
-          >
-            <Text style={styles.connectBtnText}>PASANGKAN OBD2 SEKARANG</Text>
-          </TouchableOpacity>
         </View>
       );
     }
 
-    // TAHAP 3: Menunggu Kontak ON (ESP32 sedang menembak ELM327 ke ECU)
+    // TAHAP 2: Pembeli Baru (Minta Konfigurasi OBD2)
+    if (state.obdStatus === "waiting_mac") {
+      return (
+        <WaitingMacScreen
+          onOpenSettings={() => actions.setShowSettings(true)}
+        />
+      );
+    }
+
+    // TAHAP 3: Menunggu Kunci Kontak Mobil Posisi ON
     if (state.obdStatus === "connecting_ecu") {
       return (
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            padding: 25,
-            backgroundColor: "#111",
-          }}
-        >
-          <ActivityIndicator size="large" color="#00ff88" />
-          <Text
-            style={{
-              color: "#fff",
-              fontSize: 18,
-              fontWeight: "bold",
-              marginTop: 25,
-              textAlign: "center",
-            }}
-          >
-            Menghubungkan ke ECU Mobil...
-          </Text>
-          <Text
-            style={{
-              color: "#777",
-              textAlign: "center",
-              marginTop: 12,
-              lineHeight: 24,
-              paddingHorizontal: 20,
-            }}
-          >
-            Koneksi ke modul aman. Sekarang ESP32 sedang mencoba membangun
-            jembatan data ke mesin mobil.{"\n"}
-            {"\n"}
-            <Text style={{ color: "#00ff88", fontWeight: "bold" }}>
-              ⚠️ Pastikan Kunci Kontak Mobil Posisi ON!
-            </Text>
-          </Text>
-        </View>
+        <ConnectingEcuScreen
+          onOpenSettings={() => actions.setShowSettings(true)}
+          onDisconnect={() => actions.disconnectDevice()}
+        />
       );
     }
   };
 
-  // FRAME CORE APLIKASI
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* 🚀 Render Konten Dinamis Di Sini */}
+      {/* 🚀 Render Konten Dinamis */}
       {renderMainContent()}
 
-      {/* FAB RECORDING (Hanya muncul saat siap/dashboard aktif) */}
+      {/* FAB RECORDING (Merapat Kiri Otomatis Saat Nyumput) */}
       {(state.obdStatus === "ready" || state.isBypassed) && (
         <Animated.View
           {...state.panResponder.panHandlers}
@@ -178,6 +126,7 @@ export default function DashboardScreen() {
             style={[
               styles.recordFab,
               state.isRecording && styles.recordFabActive,
+              !state.isFabOpen && { justifyContent: "center" },
             ]}
             onPress={() => {
               if (!state.isFabOpen) actions.toggleFab(true);
@@ -189,15 +138,12 @@ export default function DashboardScreen() {
             }}
           >
             <Ionicons
-              name={
-                state.isRecording
-                  ? "stop"
-                  : state.isFabOpen
-                    ? "videocam"
-                    : "chevron-back"
+              name={state.isRecording ? "stop" : "videocam"}
+              size={state.isFabOpen ? 28 : 20}
+              color={
+                state.isRecording ? "#fff" : state.isFabOpen ? "#000" : "#fff"
               }
-              size={28}
-              color={state.isRecording ? "#fff" : "#000"}
+              style={!state.isFabOpen && { position: "absolute", left: 6 }}
             />
           </TouchableOpacity>
         </Animated.View>
@@ -210,7 +156,7 @@ export default function DashboardScreen() {
         onPress={actions.handleSecretOtaTrigger}
       />
 
-      {/* SEMUA MODAL TETAP MENYALA DI SINI AGAR BISA DIPANGGIL KAPAN SAJA */}
+      {/* GLOBAL OVERLAY LAYER MODALS */}
       <TransmissionModal
         visible={state.showTransModal}
         onSelect={actions.saveTransmission}

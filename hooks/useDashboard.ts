@@ -70,8 +70,9 @@ export default function useDashboard() {
   const [isConnectingBLE, setIsConnectingBLE] = useState(false);
   const connectingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [obdStatus, setObdStatus] = useState<
-    "disconnected" | "waiting_mac" | "connecting_ecu" | "ready"
+    "disconnected" | "waiting_mac" | "checking" | "connecting_ecu" | "ready"
   >("disconnected");
+  const [isObdStandby, setIsObdStandby] = useState(false);
 
   // --- 6. RADAR & ALERT STATE ---
   const [showScanner, setShowScanner] = useState(false);
@@ -252,6 +253,15 @@ export default function useDashboard() {
       });
       if (config.autolock !== undefined) setAutoLock(config.autolock === "1");
       if (config.lockspeed !== undefined) setLockSpeed(config.lockspeed);
+
+      // 👇 3. INI GERBANG LALU LINTASNYA 👇
+      if (config.hasmac === "0") {
+        // Jika ESP32 bilang memorinya kosong, banting setir ke layar Setup!
+        setObdStatus("waiting_mac");
+      } else if (config.hasmac === "1" && obdStatus !== "ready") {
+        // Jika ESP32 bilang memorinya ada, baru boleh lanjut ke layar ECU!
+        setObdStatus("connecting_ecu");
+      }
     }
   };
 
@@ -357,6 +367,7 @@ export default function useDashboard() {
 
   useEffect(() => {
     if (isConnected) {
+      lastUpdateTime.current = Date.now();
       if (connectingTimerRef.current) {
         clearTimeout(connectingTimerRef.current);
         connectingTimerRef.current = null;
@@ -383,9 +394,8 @@ export default function useDashboard() {
     if (!isConnected) {
       setObdStatus("disconnected");
     } else {
-      setObdStatus((prev) =>
-        prev === "disconnected" ? "connecting_ecu" : prev,
-      );
+      // PERBAIKAN: Masuk ke mode tahan/loading dulu untuk nanya ke ESP32!
+      setObdStatus("checking");
     }
   }, [isConnected]);
 
@@ -469,6 +479,11 @@ export default function useDashboard() {
     RNStatusBar.setHidden(false, "slide");
     await deactivateKeepAwake();
     setIsHudMode(false);
+
+    if (hudTapTimer.current) {
+      clearTimeout(hudTapTimer.current);
+      setHudTapCount(0);
+    }
   };
 
   const handleSetupSecretTap = () => {
@@ -501,18 +516,32 @@ export default function useDashboard() {
   };
 
   const disconnectOBD = () => {
-    setConfirmAlert({
-      visible: true,
-      title: "Standby Mode",
-      message: "Memutus ESP32 dari OBD2. Lanjutkan?",
-      confirmText: "Ya",
-      cancelText: "Batal",
-      isDanger: true,
-      onConfirm: () => {
-        sendMessage("DISCONNECT_OBD");
-        setConfirmAlert((prev) => ({ ...prev, visible: false }));
-      },
-    });
+    if (isObdStandby) {
+      sendMessage("CONNECT_OBD");
+      setIsObdStandby(false);
+      setObdStatus("connecting_ecu");
+      showAlert(
+        "Menghubungkan",
+        "ESP32 mencoba mengunci ulang OBD2...",
+        "success",
+      );
+    } else {
+      setConfirmAlert({
+        visible: true,
+        title: "Masuk Mode Standby",
+        message: "Memutus ESP32 dari OBD2. Lanjutkan?",
+        confirmText: "Ya, Putuskan",
+        cancelText: "Batal",
+        isDanger: true,
+        onConfirm: () => {
+          sendMessage("DISCONNECT_OBD");
+          setIsObdStandby(true);
+          setObdStatus("checking");
+          setConfirmAlert((prev) => ({ ...prev, visible: false }));
+          showAlert("Standby Aktif", "Koneksi OBD2 dilepas", "success");
+        },
+      });
+    }
   };
 
   const startScannerUI = (type: "bluetooth" | "wifi") => {
@@ -546,7 +575,7 @@ export default function useDashboard() {
         visible: true,
         title: "Masuk Mode Update (OTA)?",
         message: `Modul akan restart dan mencari Hotspot:\n"${otaSsid}"\n\nPastikan Hotspot HP Mas sudah aktif.`,
-        confirmText: "Ya, Masuk OTA",
+        confirmText: "Ya",
         cancelText: "Batal",
         isDanger: true, // 👈 Kita set TRUE biar tombol konfirmasinya berwarna merah tegas, menandakan aksi restart!
         onConfirm: () => {
@@ -607,6 +636,7 @@ export default function useDashboard() {
       obdIp,
       obdPort,
       obdStatus,
+      isObdStandby,
       autoLock,
       lockSpeed,
       isConnectingBLE,

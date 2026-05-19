@@ -11,7 +11,7 @@ export default function TransmissionModal({ visible, onSelect }: any) {
           <Ionicons
             name="car-sport"
             size={50}
-            color="#00ffcc"
+            color="#00ff88"
             style={{ marginBottom: 15 }}
           />
           <Text
@@ -43,7 +43,7 @@ export default function TransmissionModal({ visible, onSelect }: any) {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.saveBtn, { flex: 1, backgroundColor: "#00ffcc" }]}
+              style={[styles.saveBtn, { flex: 1, backgroundColor: "#00ff88" }]}
               onPress={() => onSelect("matic")}
             >
               <Text style={[styles.saveBtnText, { color: "#000" }]}>MATIC</Text>
