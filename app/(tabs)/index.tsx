@@ -23,6 +23,7 @@ import ConfirmModal from "../../components/dashboard/Modal/ConfirmModal";
 import HudModal from "../../components/dashboard/Modal/HudModal";
 import OTAModal from "../../components/dashboard/Modal/OTAModal";
 import SettingsModal from "../../components/dashboard/Modal/SettingsModal";
+import TerminalModal from "../../components/dashboard/Modal/TerminalModal";
 import TransmissionModal from "../../components/dashboard/Modal/TransmissionModal";
 import SetupScreen from "../../components/dashboard/SetupScreen";
 import { styles } from "../../styles/dashboard.styles";
@@ -47,6 +48,7 @@ export default function DashboardScreen() {
             onOpenSettings={() => actions.setShowSettings(true)}
             onDisconnect={actions.disconnectOBD}
             isObdStandby={state.isObdStandby}
+            onOpenTerminal={() => actions.setShowTerminal(true)}
           />
           <MainGauges rpm={state.data.r} speed={state.data.s} />
           <DataGrid
@@ -161,6 +163,7 @@ export default function DashboardScreen() {
         visible={state.showTransModal}
         onSelect={actions.saveTransmission}
       />
+
       <ConfirmModal
         visible={state.confirmAlert.visible}
         config={state.confirmAlert}
@@ -214,6 +217,13 @@ export default function DashboardScreen() {
         transmission={state.transmission}
         instFuel={state.instFuel}
         avgFuel={state.avgFuel}
+      />
+
+      <TerminalModal
+        visible={state.showTerminal}
+        onClose={actions.closeTerminal}
+        logs={state.terminalLogs}
+        onSend={actions.sendToTerminal}
       />
     </SafeAreaView>
   );

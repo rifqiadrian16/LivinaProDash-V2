@@ -1,6 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
-import { Text, TouchableOpacity, View } from "react-native";
+import React, { useRef } from "react";
+import {
+  Text,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from "react-native";
 import { styles } from "../../styles/dashboard.styles";
 
 export default function DashboardHeader({
@@ -10,10 +15,36 @@ export default function DashboardHeader({
   onOpenSettings,
   onDisconnect,
   isObdStandby,
+  onOpenTerminal,
 }: any) {
+  const tapCount = useRef(0);
+  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleBrandTap = () => {
+    tapCount.current += 1;
+
+    // Reset timer setiap kali diketuk
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+
+    // Jika tidak diketuk lagi dalam 1 detik, reset ke 0
+    tapTimer.current = setTimeout(() => {
+      tapCount.current = 0;
+    }, 1000);
+
+    // Jika berhasil mencapai 5x tap
+    if (tapCount.current >= 5) {
+      tapCount.current = 0; // Reset
+      if (onOpenTerminal) onOpenTerminal(); // Buka Terminal!
+    }
+  };
+
   return (
     <View style={styles.header}>
-      <Text style={styles.brandText}>PRODASH</Text>
+      <TouchableWithoutFeedback onPress={handleBrandTap}>
+        <View>
+          <Text style={styles.brandText}>PRODASH</Text>
+        </View>
+      </TouchableWithoutFeedback>
       <View style={styles.headerRight}>
         <TouchableOpacity onPress={onEnterHud} style={styles.iconBtn}>
           <Ionicons
@@ -27,8 +58,8 @@ export default function DashboardHeader({
         </TouchableOpacity>
         <TouchableOpacity onPress={onDisconnect} style={styles.iconBtn}>
           <Ionicons
-            name={isObdStandby ? "play-circle-outline" : "stop-circle-outline"}
-            size={24}
+            name={isObdStandby ? "power-outline" : "power-outline"}
+            size={18}
             color={isObdStandby ? "#00ff88" : "#ff4444"}
           />
         </TouchableOpacity>

@@ -90,6 +90,14 @@ export default function useDashboard() {
     onConfirm: () => {},
   });
 
+  // --- 7. TERMINAL STATE ---
+  const [showTerminal, setShowTerminal] = useState(false);
+  const [terminalLogs, setTerminalLogs] = useState<string[]>([
+    "LivinaProDash OBD Terminal v1.0",
+    "Ketik PID lalu tekan Enter/Kirim...",
+    "--------------------------------",
+  ]);
+
   // --- FAB ANIMATION ---
   const fabX = useRef(new Animated.Value(45)).current;
   const [isFabOpen, setIsFabOpen] = useState(false);
@@ -220,17 +228,30 @@ export default function useDashboard() {
       currentTripId.current = Date.now().toString();
       lastUpdateTime.current = Date.now();
       lastSaveTime.current = Date.now();
-      setIsRecording(true);
-      showAlert("Recording", "GPS & Telemetri aktif.", "success");
+
+      AsyncStorage.removeItem("@livina_trip_buffer").then(() => {
+        setIsRecording(true);
+        activateKeepAwakeAsync("recording");
+        showAlert("Recording", "GPS & Telemetri aktif.", "success");
+      });
     } else {
+      // 🔴 STOP REKAMAN
       setIsRecording(false);
+      deactivateKeepAwake("recording");
       saveTripData(true).catch((e) => console.log("[TRIP] Gagal simpan:", e));
     }
   };
 
   // --- BLE HANDLERS ---
   const handleRawText = (raw: string) => {
-    console.log("📨 [BALASAN ECU]:", raw);
+    console.log("📡 [BALASAN ECU]:", raw);
+
+    // 👇 SUNTIKAN TERMINAL: Tangkap balasan RAW_RES
+    if (raw.startsWith("RAW_RES:")) {
+      const balasan = raw.substring(8);
+      setTerminalLogs((prev) => [...prev, `ECU > ${balasan || "NO DATA"}`]);
+      return; // Stop di sini agar tidak memicu logic lain
+    }
     if (raw === "STATUS:WAITING_MAC") {
       setObdStatus("waiting_mac");
     } else if (raw === "SCAN_STATUS:SCANNING") setIsSearchingOBD(true);
@@ -278,13 +299,13 @@ export default function useDashboard() {
     let fuelFlow = newData.m * 0.3309;
     fuelFlow = fuelFlow * (1 + (newData.st + newData.lt) / 100);
 
-    const isDFCO = newData.th < 20 && newData.s > 20 && newData.r > 1200;
+    const isDFCO = newData.th === 0 && newData.s > 20 && newData.r > 1200;
     if (isDFCO) {
       fuelFlow = 0; // Injektor mati
     }
 
     // --- 4. KALKULASI AVG FUEL (TOTAL DISTANCE / TOTAL FUEL) ---
-    if (dt > 0 && dt < 1) {
+    if (dt > 0 && dt < 0.003) {
       // Abaikan lonjakan waktu saat pertama connect
       sessionStats.current.distance += newData.s * dt;
       sessionStats.current.fuel += fuelFlow * dt;
@@ -296,8 +317,10 @@ export default function useDashboard() {
 
     // --- 5. LOGIC RECORDING KE DALAM RIWAYAT PERJALANAN ---
     if (isRecordingRef.current) {
-      runningStats.current.distance += newData.s * dt;
-      runningStats.current.fuel += fuelFlow * dt;
+      if (dt > 0 && dt < 0.003) {
+        runningStats.current.distance += newData.s * dt;
+        runningStats.current.fuel += fuelFlow * dt;
+      }
 
       // Hitung Inst Fuel khusus untuk rekaman CSV
       let recInst = 0.0;
@@ -374,6 +397,8 @@ export default function useDashboard() {
       }
       setIsConnectingBLE(false);
       const timer = setTimeout(() => {
+        setIsObdStandby(false);
+        sendMessage("CONNECT_OBD");
         sendMessage("GET_CONFIG");
         if (isNightTime)
           setTimeout(
@@ -467,7 +492,7 @@ export default function useDashboard() {
     );
     await NavigationBar.setVisibilityAsync("hidden");
     RNStatusBar.setHidden(true, "none");
-    await activateKeepAwakeAsync();
+    await activateKeepAwakeAsync("hud");
     setIsHudMode(true);
   };
 
@@ -477,7 +502,7 @@ export default function useDashboard() {
     );
     await NavigationBar.setVisibilityAsync("visible");
     RNStatusBar.setHidden(false, "slide");
-    await deactivateKeepAwake();
+    await deactivateKeepAwake("hud");
     setIsHudMode(false);
 
     if (hudTapTimer.current) {
@@ -536,7 +561,6 @@ export default function useDashboard() {
         onConfirm: () => {
           sendMessage("DISCONNECT_OBD");
           setIsObdStandby(true);
-          setObdStatus("checking");
           setConfirmAlert((prev) => ({ ...prev, visible: false }));
           showAlert("Standby Aktif", "Koneksi OBD2 dilepas", "success");
         },
@@ -600,7 +624,7 @@ export default function useDashboard() {
   let currentFuelFlow = data.m * 0.3309;
   currentFuelFlow = currentFuelFlow * (1 + (data.st + data.lt) / 100);
 
-  const isDFCO = data.th < 23 && data.s > 20 && data.r > 1200;
+  const isDFCO = data.th === 0 && data.s > 20 && data.r > 1200;
   if (isDFCO) currentFuelFlow = 0;
 
   let instFuel = 0.0;
@@ -611,6 +635,22 @@ export default function useDashboard() {
   } else {
     instFuel = 0.0; // Saat idle (speed <= 2)
   }
+
+  const sendToTerminal = (cmd: string) => {
+    if (!cmd.trim()) return;
+    setTerminalLogs((prev) => [...prev, `$ ${cmd}`]);
+    sendMessage(`RAW:${cmd}`); // Tembak ke ESP32
+  };
+
+  const closeTerminal = () => {
+    setShowTerminal(false); // Tutup layarnya
+    // Kembalikan teks ke kondisi awal (Reset)
+    setTerminalLogs([
+      "LivinaProDash OBD Terminal v1.0",
+      "Ketik PID lalu tekan Enter/Kirim...",
+      "--------------------------------",
+    ]);
+  };
 
   // --- KEMBALIKAN SEMUA STATE & ACTIONS KE INDEX.TSX ---
   return {
@@ -649,6 +689,8 @@ export default function useDashboard() {
       isFabOpen,
       panResponder,
       hudTapCount,
+      showTerminal,
+      terminalLogs,
     },
     actions: {
       setOtaSsid,
@@ -665,7 +707,8 @@ export default function useDashboard() {
       setLockSpeed,
       setShowScanner,
       setConfirmAlert,
-
+      setShowTerminal,
+      sendToTerminal,
       handleConnectToModule,
       applyOBDConfig,
       enterHudMode,
@@ -683,6 +726,7 @@ export default function useDashboard() {
       enterOTAMode,
       toggleRecording,
       handleHudTap,
+      closeTerminal,
     },
   };
 }
