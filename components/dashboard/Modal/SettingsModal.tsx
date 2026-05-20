@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Keyboard,
   Modal,
-  ScrollView,
+  Platform,
   Text,
   TextInput,
   TouchableOpacity,
@@ -32,7 +34,6 @@ export default function SettingsModal({
   setLockSpeed,
   onApply,
   onStartScan,
-  // Scanner Props
   showScanner,
   setShowScanner,
   isSearchingOBD,
@@ -41,6 +42,39 @@ export default function SettingsModal({
   sendMessage,
 }: any) {
   const [secretTapCount, setSecretTapCount] = useState(0);
+  const keyboardOffset = useRef(new Animated.Value(0)).current;
+
+  // ==========================================
+  // LOGIKA ANIMASI KEYBOARD: TRANSLATE Y
+  // ==========================================
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const onShow = Keyboard.addListener(showEvent, (e) => {
+      Animated.timing(keyboardOffset, {
+        // Menggeser fisik kotak secara visual ke atas (Minus Y)
+        toValue: -(e.endCoordinates.height / 2) - 20,
+        duration: Platform.OS === "ios" ? e.duration : 200,
+        useNativeDriver: true, // Animasi diproses di GPU, dijamin super mulus!
+      }).start();
+    });
+
+    const onHide = Keyboard.addListener(hideEvent, (e) => {
+      Animated.timing(keyboardOffset, {
+        toValue: 0, // Kembali turun ke posisi semula
+        duration: Platform.OS === "ios" ? e.duration : 200,
+        useNativeDriver: true,
+      }).start();
+    });
+
+    return () => {
+      onShow.remove();
+      onHide.remove();
+    };
+  }, [keyboardOffset]);
 
   useEffect(() => {
     if (!visible) {
@@ -52,8 +86,15 @@ export default function SettingsModal({
     <>
       {/* 1. MODAL UTAMA PENGATURAN */}
       <Modal visible={visible} transparent animationType="slide">
+        {/* Background tetap diam */}
         <View style={styles.modalBg}>
-          <View style={[styles.modalBox, { maxHeight: "85%" }]}>
+          {/* Kotak Modal ini yang akan TERBANG ke atas menghindari Keyboard */}
+          <Animated.View
+            style={[
+              styles.modalBox,
+              { transform: [{ translateY: keyboardOffset }] }, // <--- KUNCI SIHIRNYA DI SINI
+            ]}
+          >
             <View
               style={{
                 flexDirection: "row",
@@ -74,10 +115,8 @@ export default function SettingsModal({
               </TouchableOpacity>
             </View>
 
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 10 }}
-            >
+            {/* SCROLLVIEW SUDAH MUSNAH */}
+            <View style={{ paddingBottom: 20 }}>
               {/* TAB SELECTOR */}
               <View
                 style={{
@@ -313,8 +352,8 @@ export default function SettingsModal({
                   </Text>
                 </TouchableOpacity>
               )}
-            </ScrollView>
-          </View>
+            </View>
+          </Animated.View>
         </View>
       </Modal>
 
@@ -352,7 +391,8 @@ export default function SettingsModal({
                 </Text>
               </View>
             ) : (
-              <ScrollView style={{ maxHeight: 250 }}>
+              // SCROLLVIEW DIHAPUS, DIGANTI VIEW BIASA
+              <View style={{ maxHeight: 250 }}>
                 {scannedDevices.length === 0 ? (
                   <Text
                     style={{ color: "#888", textAlign: "center", padding: 20 }}
@@ -374,7 +414,7 @@ export default function SettingsModal({
                     </TouchableOpacity>
                   ))
                 )}
-              </ScrollView>
+              </View>
             )}
           </View>
         </View>

@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  KeyboardAvoidingView,
+  Animated,
+  Keyboard,
   Modal,
   Platform,
   ScrollView,
@@ -26,11 +27,40 @@ export default function TerminalModal({
   onSend,
 }: TerminalModalProps) {
   const [inputText, setInputText] = useState("");
+  const keyboardOffset = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const onShow = Keyboard.addListener(showEvent, (e) => {
+      Animated.timing(keyboardOffset, {
+        toValue: e.endCoordinates.height + 10, // sedikit lebih rendah dari keyboard
+        duration: Platform.OS === "ios" ? e.duration : 150,
+        useNativeDriver: false,
+      }).start();
+    });
+
+    const onHide = Keyboard.addListener(hideEvent, (e) => {
+      Animated.timing(keyboardOffset, {
+        toValue: 0,
+        duration: Platform.OS === "ios" ? e.duration : 150,
+        useNativeDriver: false,
+      }).start();
+    });
+
+    return () => {
+      onShow.remove();
+      onHide.remove();
+    };
+  }, []);
+
   return (
     <Modal visible={visible} animationType="slide" transparent={false}>
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      <Animated.View
+        style={[styles.container, { paddingBottom: keyboardOffset }]}
       >
         {/* HEADER */}
         <View style={styles.header}>
@@ -70,13 +100,13 @@ export default function TerminalModal({
             value={inputText}
             onChangeText={setInputText}
             onSubmitEditing={() => {
-              if (!inputText.trim()) return; // Jangan kirim kalau kosong
-              onSend(inputText); // Kirim isinya
-              setInputText(""); // Bersihkan input setelah enter!
+              if (!inputText.trim()) return;
+              onSend(inputText);
+              setInputText("");
             }}
           />
         </View>
-      </KeyboardAvoidingView>
+      </Animated.View>
     </Modal>
   );
 }

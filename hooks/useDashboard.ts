@@ -55,6 +55,10 @@ export default function useDashboard() {
   const runningStats = useRef({ distance: 0, fuel: 0, startTime: 0 });
   const isRecordingRef = useRef(isRecording);
 
+  // --- 4b. SAVE TRIP MODAL STATE ---
+  const [showSaveTripModal, setShowSaveTripModal] = useState(false);
+  const pendingTripName = useRef("");
+
   // --- 5. SETTINGS STATE ---
   const [showSettings, setShowSettings] = useState(false);
   const [obdType, setObdType] = useState<"bluetooth" | "wifi">("bluetooth");
@@ -172,7 +176,7 @@ export default function useDashboard() {
     isRecordingRef.current = isRecording;
   }, [isRecording]);
 
-  const saveTripData = async (isFinal = false) => {
+  const saveTripData = async (isFinal = false, tripName?: string) => {
     if (tripDataRef.current.length < 5) return;
     try {
       const bufferRaw = await AsyncStorage.getItem("@livina_trip_buffer");
@@ -183,6 +187,8 @@ export default function useDashboard() {
       const topSpeed = Math.max(...allData.map((d) => d.speed));
       const fuelUsed = runningStats.current.fuel.toFixed(1);
 
+      const defaultName = `Livina Drive (${new Date().toLocaleTimeString()})`;
+
       const newTrip = {
         id: currentTripId.current,
         date: new Date().toLocaleDateString("id-ID", {
@@ -190,7 +196,7 @@ export default function useDashboard() {
           month: "short",
           year: "numeric",
         }),
-        route: `Livina Drive (${new Date().toLocaleTimeString()})`,
+        route: tripName?.trim() || defaultName,
         distance: runningStats.current.distance.toFixed(1) + " km",
         time:
           Math.round((Date.now() - runningStats.current.startTime) / 60000) +
@@ -235,11 +241,25 @@ export default function useDashboard() {
         showAlert("Recording", "GPS & Telemetri aktif.", "success");
       });
     } else {
-      // 🔴 STOP REKAMAN
+      // 🔴 STOP REKAMAN — tampilkan modal nama dulu
       setIsRecording(false);
       deactivateKeepAwake("recording");
-      saveTripData(true).catch((e) => console.log("[TRIP] Gagal simpan:", e));
+      setShowSaveTripModal(true);
     }
+  };
+
+  const confirmSaveTrip = (tripName: string) => {
+    setShowSaveTripModal(false);
+    saveTripData(true, tripName).catch((e) =>
+      console.log("[TRIP] Gagal simpan:", e),
+    );
+  };
+
+  const discardTrip = () => {
+    setShowSaveTripModal(false);
+    tripDataRef.current = [];
+    AsyncStorage.removeItem("@livina_trip_buffer");
+    showAlert("Dibatalkan", "Trip tidak disimpan.", "error");
   };
 
   // --- BLE HANDLERS ---
@@ -691,6 +711,7 @@ export default function useDashboard() {
       hudTapCount,
       showTerminal,
       terminalLogs,
+      showSaveTripModal,
     },
     actions: {
       setOtaSsid,
@@ -727,6 +748,8 @@ export default function useDashboard() {
       toggleRecording,
       handleHudTap,
       closeTerminal,
+      confirmSaveTrip,
+      discardTrip,
     },
   };
 }

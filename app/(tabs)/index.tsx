@@ -26,6 +26,7 @@ import SettingsModal from "../../components/dashboard/Modal/SettingsModal";
 import TerminalModal from "../../components/dashboard/Modal/TerminalModal";
 import TransmissionModal from "../../components/dashboard/Modal/TransmissionModal";
 import SetupScreen from "../../components/dashboard/SetupScreen";
+import SaveTripModal from "../../components/trip/SaveTripModal";
 import { styles } from "../../styles/dashboard.styles";
 
 export default function DashboardScreen() {
@@ -141,9 +142,9 @@ export default function DashboardScreen() {
           >
             <Ionicons
               name={state.isRecording ? "stop" : "videocam"}
-              size={state.isFabOpen ? 28 : 20}
+              size={state.isFabOpen ? 28 : 13}
               color={
-                state.isRecording ? "#fff" : state.isFabOpen ? "#000" : "#fff"
+                state.isRecording ? "#fff" : state.isFabOpen ? "#000" : "#000"
               }
               style={!state.isFabOpen && { position: "absolute", left: 6 }}
             />
@@ -217,6 +218,12 @@ export default function DashboardScreen() {
         transmission={state.transmission}
         instFuel={state.instFuel}
         avgFuel={state.avgFuel}
+      />
+
+      <SaveTripModal
+        visible={state.showSaveTripModal}
+        onSave={actions.confirmSaveTrip}
+        onDiscard={actions.discardTrip}
       />
 
       <TerminalModal

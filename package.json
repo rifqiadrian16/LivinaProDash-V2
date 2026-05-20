@@ -28,6 +28,7 @@
     "expo-keep-awake": "~55.0.8",
     "expo-linking": "~55.0.15",
     "expo-location": "~55.1.9",
+    "expo-media-library": "~55.0.17",
     "expo-navigation-bar": "~55.0.12",
     "expo-router": "~55.0.14",
     "expo-screen-orientation": "~55.0.14",

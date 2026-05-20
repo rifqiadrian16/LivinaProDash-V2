@@ -53,6 +53,12 @@
         }
       ],
       [
+        "expo-media-library",
+        {
+          "photosPermission": "Izinkan akses galeri untuk menyimpan kartu trip."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/livinaprodash.png",
