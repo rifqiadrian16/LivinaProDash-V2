@@ -79,7 +79,7 @@ export default function ShareModal({
                   shareTheme === "solid" && { color: "#111" },
                 ]}
               >
-                Ridecheck (Solid)
+                Solid
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
