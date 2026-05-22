@@ -8,12 +8,11 @@ import * as Sharing from "expo-sharing";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   ScrollView,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import {
   SafeAreaView,
@@ -28,7 +27,7 @@ import { tripStyles as styles } from "../../styles/trip.styles";
 import { getMapHtml } from "../../utils/tripTemplates";
 
 export default function TripScreen() {
-  const { showAlert } = useAlert();
+  const { showAlert, showConfirm } = useAlert();
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
   const [playbackIndex, setPlaybackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -44,40 +43,25 @@ export default function TripScreen() {
   const insets = useSafeAreaInsets();
 
   const deleteTrip = (tripId: string) => {
-    Alert.alert(
+    showConfirm(
       "Hapus Perjalanan",
-      "Yakin untuk menghapus pejalanan ini secara permanen?",
-      [
-        { text: "Batal", style: "cancel" },
-        {
-          text: "Hapus",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const updatedTrips = tripHistory.filter((t) => t.id !== tripId);
+      "Yakin untuk menghapus perjalanan ini secara permanen?",
+      async () => {
+        try {
+          const updatedTrips = tripHistory.filter((t) => t.id !== tripId);
 
-              await AsyncStorage.setItem(
-                "@livina_trips",
-                JSON.stringify(updatedTrips),
-              );
-              setTripHistory(updatedTrips);
-              setSelectedTrip(null);
+          await AsyncStorage.setItem(
+            "@livina_trips",
+            JSON.stringify(updatedTrips),
+          );
+          setTripHistory(updatedTrips);
+          setSelectedTrip(null);
 
-              showAlert(
-                "TERHAPUS",
-                "Data perjalanan berhasil dihapus.",
-                "success",
-              );
-            } catch (error) {
-              showAlert(
-                "GAGAL",
-                "Terjadi kesalahan saat menghapus data.",
-                "error",
-              );
-            }
-          },
-        },
-      ],
+          showAlert("TERHAPUS", "Data perjalanan berhasil dihapus.", "success");
+        } catch (error) {
+          showAlert("GAGAL", "Terjadi kesalahan saat menghapus data.", "error");
+        }
+      },
     );
   };
 

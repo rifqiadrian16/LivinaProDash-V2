@@ -420,20 +420,24 @@ export default function useDashboard() {
         setIsObdStandby(false);
         sendMessage("CONNECT_OBD");
         sendMessage("GET_CONFIG");
-        if (isNightTime)
-          setTimeout(
-            () =>
-              showAlert(
-                "Mode Malam Terdeteksi",
-                "Ketuk ikon 'Mata' untuk HUD.",
-                "success",
-              ),
-            1500,
-          );
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [isConnected, isNightTime]);
+  }, [isConnected]);
+
+  useEffect(() => {
+    const isDashboardUtama = obdStatus === "ready" || isBypassed;
+    if (isDashboardUtama && isNightTime) {
+      const AlertTimer = setTimeout(() => {
+        showAlert(
+          "Mode Malam Terdeteksi",
+          "Ketuk ikon 'mata' untuk masuk ke mode HUD",
+          "success",
+        );
+      }, 1500);
+      return () => clearTimeout(AlertTimer);
+    }
+  }, [obdStatus, isBypassed, isNightTime]);
 
   useEffect(() => {
     if (!isConnected) {

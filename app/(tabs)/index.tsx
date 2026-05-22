@@ -31,7 +31,6 @@ import { styles } from "../../styles/dashboard.styles";
 
 export default function DashboardScreen() {
   const { state, actions } = useDashboard();
-
   // 🛡️ GERBANG LOGIKA TAMPILAN DINAMIS
   const renderMainContent = () => {
     // KONDISI UTAMA: Tampilkan Dashboard Aktif
@@ -161,7 +160,10 @@ export default function DashboardScreen() {
 
       {/* GLOBAL OVERLAY LAYER MODALS */}
       <TransmissionModal
-        visible={state.showTransModal}
+        visible={
+          state.showTransModal &&
+          (state.obdStatus === "ready" || state.isBypassed)
+        }
         onSelect={actions.saveTransmission}
       />
 
@@ -172,6 +174,7 @@ export default function DashboardScreen() {
           actions.setConfirmAlert({ ...state.confirmAlert, visible: false })
         }
       />
+
       <OTAModal
         visible={state.showOTAModal}
         onClose={() => actions.setShowOTAModal(false)}

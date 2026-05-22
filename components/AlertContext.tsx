@@ -19,6 +19,13 @@ export const AlertProvider = ({ children }: { children: React.ReactNode }) => {
     type: "error", // 'error' | 'success'
   });
 
+  const [confirmConfig, setConfirmConfig] = useState({
+    visible: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
   const showAlert = (title: string, message: string, type = "error") => {
     setAlertConfig({ visible: true, title, message, type });
   };
@@ -27,8 +34,25 @@ export const AlertProvider = ({ children }: { children: React.ReactNode }) => {
     setAlertConfig((prev) => ({ ...prev, visible: false }));
   };
 
+  const showConfirm = (
+    title: string,
+    message: string,
+    onConfirmAction: () => void,
+  ) => {
+    setConfirmConfig({
+      visible: true,
+      title,
+      message,
+      onConfirm: onConfirmAction,
+    });
+  };
+
+  const hideConfirm = () => {
+    setConfirmConfig((prev) => ({ ...prev, visible: false }));
+  };
+
   return (
-    <AlertContext.Provider value={{ showAlert, hideAlert }}>
+    <AlertContext.Provider value={{ showAlert, hideAlert, showConfirm }}>
       {children}
 
       {/* MODAL GLOBAL YANG HANYA DITULIS 1 KALI */}
@@ -70,6 +94,40 @@ export const AlertProvider = ({ children }: { children: React.ReactNode }) => {
             >
               <Text style={styles.alertBtnText}>MENGERTI</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        transparent={true}
+        visible={confirmConfig.visible}
+        animationType="fade"
+        onRequestClose={hideConfirm}
+      >
+        <View style={styles.alertOverlay}>
+          <View style={[styles.alertBox, { borderTopColor: "#ff4444" }]}>
+            <Ionicons name="help-circle" size={56} color={"#ff4444"} />
+            <Text style={styles.alertTitle}>{confirmConfig.title}</Text>
+            <Text style={styles.alertMessage}>{confirmConfig.message}</Text>
+
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={[styles.alertBtn, styles.cancelBtn]}
+                onPress={hideConfirm}
+              >
+                <Text style={styles.cancelBtnText}>Batal</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.alertBtn, styles.confirmBtn]}
+                onPress={() => {
+                  confirmConfig.onConfirm();
+                  hideConfirm();
+                }}
+              >
+                <Text style={styles.confirmBtnText}>Hapus</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -127,5 +185,29 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     fontSize: 14,
     letterSpacing: 1.5,
+  },
+  buttonRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    gap: 10, // Memberi jarak antar tombol
+  },
+  cancelBtn: {
+    flex: 1,
+    backgroundColor: "#333",
+  },
+  cancelBtnText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 14,
+  },
+  confirmBtn: {
+    flex: 1,
+    backgroundColor: "#ff4444",
+  },
+  confirmBtnText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 14,
   },
 });

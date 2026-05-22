@@ -2,7 +2,7 @@
   "expo": {
     "name": "LivinaProDash",
     "slug": "LivinaProDash",
-    "version": "2.7.0",
+    "version": "2.7.5",
     "orientation": "portrait",
     "icon": "./assets/images/livina.png",
     "scheme": "livinaprodash",
@@ -34,7 +34,13 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
-        "android.permission.BLUETOOTH_CONNECT"
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
       ]
     },
     "web": {
@@ -48,7 +54,10 @@
         "@config-plugins/react-native-ble-plx",
         {
           "isBackgroundEnabled": true,
-          "modes": ["peripheral", "central"],
+          "modes": [
+            "peripheral",
+            "central"
+          ],
           "bluetoothAlwaysPermission": "Livina ProDash butuh akses Bluetooth untuk terhubung dan membaca data dari Modul ECU/OBD2 Mobil Anda."
         }
       ],
@@ -87,7 +96,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "28a2db99-33d5-4e32-9064-56e2857df04a"
+        "projectId": "be25d1f2-f664-47db-9426-c7fcc94dda0a"
       }
     },
     "runtimeVersion": {
@@ -95,6 +104,7 @@
     },
     "updates": {
       "url": "https://u.expo.dev/28a2db99-33d5-4e32-9064-56e2857df04a"
-    }
+    },
+    "owner": "rifqiadrian"
   }
 }
