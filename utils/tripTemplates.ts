@@ -1,12 +1,24 @@
-// utils/tripTemplates.ts
+export const getMapHtml = (
+  tripData: any,
+  mapType: "dark" | "normal" | "satellite" = "dark",
+) => {
+  let tileUrl = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 
-export const getMapHtml = (tripData: any) => `
+  if (mapType === "normal") {
+    tileUrl = "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}";
+  } else if (mapType === "satellite") {
+    tileUrl = "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}";
+  }
+
+  return `
   <!DOCTYPE html>
   <html>
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-gesture-handling/dist/leaflet-gesture-handling.min.css" type="text/css">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-gesture-handling/dist/leaflet-gesture-handling.min.js"></script>
     <style>
       body { padding: 0; margin: 0; background: #121212; }
       #map { width: 100vw; height: 100vh; }
@@ -19,13 +31,27 @@ export const getMapHtml = (tripData: any) => `
     <script>
       const routeData = ${JSON.stringify(tripData.routeData?.map((d: any) => [d.latitude, d.longitude]) || [])};
       if (routeData.length > 0) {
-        const map = L.map('map', { zoomControl: false, attributionControl: false }).setView(routeData[0], 13);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+        
+        // +++ NYALAKAN PLUGIN & UBAH TEKSNYA KE BAHASA INDONESIA +++
+        const map = L.map('map', { 
+          zoomControl: false, 
+          attributionControl: false,
+          gestureHandling: true,
+          gestureHandlingOptions: {
+            text: {
+              touch: "Gunakan 2 jari untuk menggeser peta",
+              scroll: "Gunakan 2 jari untuk menggeser peta",
+              scrollMac: "Gunakan 2 jari untuk menggeser peta"
+            }
+          }
+        }).setView(routeData[0], 13);
+        // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        
+        L.tileLayer('${tileUrl}', { maxZoom: 19 }).addTo(map);
         L.polyline(routeData, { color: '#333', weight: 4 }).addTo(map);
         const progressLine = L.polyline([routeData[0]], { color: '#00ffcc', weight: 5 }).addTo(map);
         const icon = L.divIcon({ className: 'car-marker', html: '<div class="car-marker-inner"></div>', iconSize: [24, 24], iconAnchor: [12, 12] });
         const marker = L.marker(routeData[0], { icon: icon }).addTo(map);
-
         window.updatePlayback = function(index) {
           if(!routeData[index]) return;
           const currentCoords = routeData.slice(0, index + 1);
@@ -37,179 +63,176 @@ export const getMapHtml = (tripData: any) => `
     </script>
   </body>
   </html>
-`;
+  `;
+};
 
 export const getShareCardHtml = (trip: any, theme: "solid" | "transparent") => {
   const distNum = parseFloat(trip.distance) || 0;
   const topSpeedNum = parseFloat(trip.details?.topSpeed) || 0;
   const avgSpeed = (topSpeedNum * 0.6).toFixed(0);
-  const isSolid = theme === "solid";
-
-  // ==========================================================
-  // LOGIKA MENGUBAH KOORDINAT GPS (LAT/LON) MENJADI SVG (X/Y)
-  // ==========================================================
-  let realSvgPath = "";
-  let startX = 12,
-    startY = 196;
-  let endX = 304,
-    endY = 24;
-
-  if (trip.routeData && trip.routeData.length > 0) {
-    const W = 310;
-    const H = 210;
-    const P = 25;
-    let minLat = Infinity,
-      maxLat = -Infinity;
-    let minLon = Infinity,
-      maxLon = -Infinity;
-
-    trip.routeData.forEach((pt: any) => {
-      if (pt.latitude < minLat) minLat = pt.latitude;
-      if (pt.latitude > maxLat) maxLat = pt.latitude;
-      if (pt.longitude < minLon) minLon = pt.longitude;
-      if (pt.longitude > maxLon) maxLon = pt.longitude;
-    });
-
-    const dLat = maxLat - minLat || 0.0001;
-    const dLon = maxLon - minLon || 0.0001;
-
-    const points = trip.routeData.map((pt: any, i: number) => {
-      // Tentukan Padding Spesifik
-      const paddingLeftRight = P; // Sisi kiri-kanan tetap 25
-      const paddingTop = 40; // <--- ATUR DI SINI (Angka ini yang bikin rute turun)
-      const paddingBottom = P; // Sisi bawah tetap 25
-
-      // Longitude mapping ke X
-      const x =
-        paddingLeftRight +
-        ((pt.longitude - minLon) / dLon) * (W - 2 * paddingLeftRight);
-
-      // Latitude mapping ke Y (Menggunakan paddingTop)
-      const y =
-        paddingTop +
-        ((maxLat - pt.latitude) / dLat) * (H - paddingTop - paddingBottom);
-
-      if (i === 0) {
-        startX = x;
-        startY = y;
-      }
-      if (i === trip.routeData.length - 1) {
-        endX = x;
-        endY = y;
-      }
-
-      return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
-    });
-
-    realSvgPath = points.join(" ");
-  } else {
-    realSvgPath =
-      "M 12 196 C 30 182 55 168 78 152 C 104 134 130 118 158 102 C 186 86 212 70 240 55 C 262 43 282 34 304 24";
-  }
-
-  // ==========================================================
-  // TRIK REGEX: Otomatis membungkus huruf waktu (h & m) dengan span unit
-  // ==========================================================
+  const peakAlt = trip.details?.peakAlt || "0";
+  const climb = trip.details?.climb || "0";
   const rawTime = trip.time || "0h 0m";
   const timeHtml = rawTime.replace(
     /([a-zA-Z]+)/g,
     '<span class="unit">$1</span>',
   );
 
-  const mapSvg = isSolid
-    ? `
-    <svg viewBox="0 0 310 210" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
-      <defs>
-        <linearGradient id="mapBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0e1c2e"/><stop offset="100%" stop-color="#0a1520"/></linearGradient>
-        <linearGradient id="fadeMid" x1="0" y1="0" x2="0" y2="1"><stop offset="60%" stop-color="#111111" stop-opacity="0"/><stop offset="100%" stop-color="#111111" stop-opacity="1"/></linearGradient>
-        <linearGradient id="routeG" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#2266dd"/><stop offset="100%" stop-color="#55aaff"/></linearGradient>
-      </defs>
-      <rect width="310" height="210" fill="url(#mapBg)"/>
-      <path d="${realSvgPath}" fill="none" stroke="rgba(74,158,255,0.2)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="${realSvgPath}" fill="none" stroke="url(#routeG)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="${startX}" cy="${startY}" r="4" fill="#4a9eff"/><circle cx="${startX}" cy="${startY}" r="2" fill="#fff"/>
-      <circle cx="${endX}" cy="${endY}" r="4" fill="#55ccff"/><circle cx="${endX}" cy="${endY}" r="2" fill="#fff"/>
-      <rect y="130" width="310" height="80" fill="url(#fadeMid)"/>
-    </svg>
-  `
-    : `
-    <svg viewBox="0 0 310 210" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
-      <defs>
-        <linearGradient id="routeG" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#2266dd"/><stop offset="100%" stop-color="#66bbff"/></linearGradient>
-        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-      </defs>
-      <path d="${realSvgPath}" fill="none" stroke="#3377ee" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.12" filter="url(#glow)"/>
-      <path d="${realSvgPath}" fill="none" stroke="url(#routeG)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="${startX}" cy="${startY}" r="4" fill="#4a9eff"/><circle cx="${startX}" cy="${startY}" r="2" fill="#fff"/>
-      <circle cx="${endX}" cy="${endY}" r="4" fill="#66bbff"/><circle cx="${endX}" cy="${endY}" r="2" fill="#fff"/>
-    </svg>
-  `;
+  const routeCoords: [number, number][] = [];
+  if (trip.routeData && trip.routeData.length > 0) {
+    trip.routeData.forEach((pt: any) => {
+      routeCoords.push([pt.latitude, pt.longitude]);
+    });
+  }
 
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-      <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,700;0,900;1,900&display=swap');
-        
-        body { margin: 0; padding: 0; background: transparent; overflow: hidden; width: 310px; height: auto; }
-        .wrap { display: block; width: 310px; margin: 0; padding: 0; }
-        .card { width: 310px; background: transparent; border-radius: 16px; overflow: hidden; font-family: 'Inter', sans-serif; }
-        .map-box { width: 100%; height: 210px; position: relative; overflow: hidden; background: transparent; }
-        .map-box svg { width: 100%; height: 100%; display: block; }
-        .map-brand { position: absolute; top: 12px; left: 14px; display: flex; align-items: center; gap: 5px; ${isSolid ? "background: rgba(0,0,0,0.55); border-radius: 4px; padding: 3px 8px;" : ""} }
-        .map-brand-dot { width: 6px; height: 6px; border-radius: 50%; background: ${isSolid ? "#4a9eff" : "rgba(255,255,255,0.25)"}; }
-        .map-brand-txt { font-size: 9px; font-weight: 700; letter-spacing: 1.5px; color: rgba(255,255,255,0.6); }
-        .body { padding: 18px 18px 20px; background: transparent; }
-        .car-name { font-size: 28px; font-weight: 900; font-style: italic; color: #ffffff; line-height: 1; margin: 0 0 5px; letter-spacing: -0.5px; }
-        .trip-date { font-size: 10px; font-weight: 500; color: rgba(255,255,255,0.55); letter-spacing: 0.5px; margin: 0 0 12px; text-transform: uppercase; }
-        .accent-line { width: 28px; height: 2.5px; background: #4a9eff; border-radius: 2px; margin-bottom: 18px; }
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; row-gap: 18px; }
-        .stat-label { font-size: 9px; font-weight: 600; letter-spacing: 1px; color: rgba(255,255,255,0.5); text-transform: uppercase; margin-bottom: 3px; }
-        .stat-val { font-size: 26px; font-weight: 700; color: #ffffff; line-height: 1; letter-spacing: -0.5px; }
-        
-        /* --- KEKUATAN GLOW BIRU DI SINI --- */
-        .stat-val .unit { 
-          font-size: 13px; 
-          font-weight: 700; 
-          color: #4a9eff; /* Warna Biru */
-          text-shadow: 0 0 8px rgba(74, 158, 255, 0.8), 0 0 15px rgba(74, 158, 255, 0.4); /* Efek Glow/Neon */
-          margin-left: 2px; 
-          letter-spacing: 0; 
-        }
-        /* ---------------------------------- */
+  const routeJson = JSON.stringify(routeCoords);
+  const accentColor = "#FC4C02";
 
-        .footer { margin-top: 20px; padding-top: 14px; border-top: 0.5px solid rgba(255,255,255,0.15); display: flex; justify-content: space-between; align-items: center; }
-        .footer-brand { font-size: 9px; font-weight: 700; letter-spacing: 2px; color: rgba(255,255,255,0.5); text-transform: uppercase; }
-        .footer-tag { display: flex; align-items: center; gap: 4px; }
-        .footer-dot { width: 5px; height: 5px; border-radius: 50%; background: #4a9eff; opacity: 0.7; }
-        .footer-obd { font-size: 9px; font-weight: 600; letter-spacing: 1px; color: rgba(255,255,255,0.45); text-transform: uppercase; }
-      </style>
-    </head>
-    <body>
-      <div class="wrap">
-        <div class="card">
-          <div class="map-box">${mapSvg}<div class="map-brand"><div class="map-brand-dot"></div><span class="map-brand-txt">PRODASH</span></div></div>
-          <div class="body">
-            <div class="car-name">Grand Livina</div>
-            <div class="trip-date">${trip.date || "Unknown Date"}</div>
-            <div class="accent-line"></div>
-            <div class="stats-grid">
-              <div class="stat"><div class="stat-label">Distance</div><div class="stat-val">${distNum.toFixed(1)}<span class="unit">km</span></div></div>
-              <div class="stat"><div class="stat-label">Duration</div><div class="stat-val">${timeHtml}</div></div>
-              <div class="stat"><div class="stat-label">Top Speed</div><div class="stat-val">${topSpeedNum}<span class="unit">km/h</span></div></div>
-              <div class="stat"><div class="stat-label">Avg Speed</div><div class="stat-val">${avgSpeed}<span class="unit">km/h</span></div></div>
-            </div>
-            <div class="footer">
-              <span class="footer-brand">Livina ProDash</span>
-              <div class="footer-tag"><div class="footer-dot"></div><span class="footer-obd">Via OBD2</span></div>
-            </div>
-          </div>
-        </div>
+  // +++ LOGIKA TEMA DINAMIS SAKTI +++
+  const isSolid = theme === "solid";
+  const bgColor = isSolid ? "#111" : "transparent";
+  const fadeBg = isSolid ? "linear-gradient(transparent,#111)" : "transparent";
+  const brandBg = isSolid ? "rgba(0,0,0,0.6)" : "transparent";
+
+  // Basemap Satelit (Hanya di-load kalau temanya solid)
+  const tileUrl = isSolid
+    ? "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+    : "";
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,700;0,900;1,900&display=swap');
+* { margin:0; padding:0; box-sizing:border-box; }
+
+/* Menggunakan variabel bgColor yang akan tembus pandang jika transparan */
+body { background:transparent; overflow:hidden; width:270px; }
+.card { width:270px; background:${bgColor}; border-radius:16px; overflow:hidden; font-family:'Inter',sans-serif; }
+#map { width:270px; height:200px; }
+
+.leaflet-control-attribution { display:none !important; }
+.leaflet-container { background: ${bgColor} !important; }
+.leaflet-tile { outline: 1px solid transparent; box-shadow: 0 0 1px #111; }
+
+.map-wrap { position:relative; width:270px; height:200px; overflow:hidden; }
+.map-brand { position:absolute; top:10px; left:12px; z-index:999; background:${brandBg}; border-radius:4px; padding:3px 8px; display:flex; align-items:center; gap:4px; }
+.brand-dot { width:5px; height:5px; border-radius:50%; background:${accentColor}; }
+.brand-txt { font-size:9px; font-weight:700; letter-spacing:1.5px; color:rgba(255,255,255,0.7); }
+
+/* Efek gradien dimatikan jika transparan */
+.fade-btm { position:absolute; bottom:0; left:0; width:270px; height:70px; z-index:998; background:${fadeBg}; pointer-events:none; }
+.body { padding:16px 18px 18px; background:${bgColor}; }
+
+.car-name { font-size:26px; font-weight:900; font-style:italic; color:#fff; margin-bottom:3px; letter-spacing:-0.5px; }
+.trip-date { font-size:10px; color:rgba(255,255,255,0.45); margin-bottom:12px; letter-spacing:0.5px; text-transform:uppercase; }
+.accent { width:24px; height:2.5px; background:${accentColor}; border-radius:2px; margin-bottom:16px; }
+.stats { display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; }
+.stat-label { font-size:9px; color:rgba(255,255,255,0.4); letter-spacing:1px; margin-bottom:2px; text-transform:uppercase; }
+.stat-val { font-size:24px; font-weight:700; color:#fff; line-height:1; letter-spacing:-0.5px; }
+.unit { font-size:12px; font-weight:700; color:${accentColor}; margin-left:1px; }
+.footer { margin-top:16px; padding-top:12px; border-top:0.5px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center; }
+.footer-brand { font-size:9px; font-weight:700; letter-spacing:2px; color:rgba(255,255,255,0.4); text-transform:uppercase; }
+.footer-via { font-size:9px; color:rgba(255,255,255,0.3); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="map-brand"><div class="brand-dot"></div><span class="brand-txt">PRODASH</span></div>
+    <div class="fade-btm"></div>
+  </div>
+  <div class="body">
+    <div class="car-name">Grand Livina</div>
+    <div class="trip-date">${trip.date || ""}</div>
+    <div class="accent"></div>
+    <div class="stats">
+      <div><div class="stat-label">Distance</div><div class="stat-val">${distNum.toFixed(1)}<span class="unit">km</span></div></div>
+      <div><div class="stat-label">Duration</div><div class="stat-val">${timeHtml}</div></div>
+      <div><div class="stat-label">Top Speed</div><div class="stat-val">${topSpeedNum}<span class="unit">km/h</span></div></div>
+      <div><div class="stat-label">Avg Speed</div><div class="stat-val">${avgSpeed}<span class="unit">km/h</span></div></div>
+      
+      <div><div class="stat-label">Peak Alt</div><div class="stat-val">${peakAlt}<span class="unit">m</span></div></div>
+      <div><div class="stat-label">Climb</div><div class="stat-val">${climb}<span class="unit">m</span></div></div>
       </div>
-    </body>
-    </html>
-  `;
+    <div class="footer">
+      <span class="footer-brand">Livina ProDash</span>
+      <span class="footer-via">Via OBD2</span>
+    </div>
+  </div>
+</div>
+<script>
+var coords = ${routeJson};
+var map = L.map('map', {
+  preferCanvas: true,
+  zoomControl: false,
+  attributionControl: false,
+  dragging: false,
+  scrollWheelZoom: false,
+  touchZoom: false,
+  tap: false,
+  fadeAnimation: false,
+  zoomAnimation: false,
+  markerZoomAnimation: false,
+  zoomSnap: 0.1
+});
+if (${isSolid}) {
+    L.tileLayer('${tileUrl}', { maxZoom: 19, detectRetina: true }).addTo(map);
+  }
+
+if (coords.length > 0) {
+  var bounds = L.latLngBounds(coords);
+  
+  // 2. Gunakan padding 15 agar rute punya bingkai pelindung dan tak akan pernah kepotong
+  map.fitBounds(bounds, { padding: [45, 45], animate: false, maxZoom: 16});
+
+  // Layer Glow (Shadow)
+  L.polyline(coords, { color: '${accentColor}', weight: 6, opacity: 0.2, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+  
+  // Layer Inti (Solid)
+  L.polyline(coords, { color: '${accentColor}', weight: 2.5, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+
+  function dot(bg, border) {
+    return L.divIcon({
+      html: '<div style="width:10px;height:10px;border-radius:50%;background:' + bg + ';border:2.5px solid ' + border + ';box-sizing:border-box;"></div>',
+      className: '', iconSize: [10, 10], iconAnchor: [5, 5]
+    });
+  }
+  L.marker(coords[0], { icon: dot('#fff', '#ccc') }).addTo(map);
+  L.marker(coords[coords.length - 1], { icon: dot('${accentColor}', '#fff') }).addTo(map);
+}
+
+// Tunggu map benar-benar selesai render lalu signal RN
+var sent = false;
+function signal() {
+  if (sent) return;
+  sent = true;
+  window.ReactNativeWebView && window.ReactNativeWebView.postMessage('MAP_READY');
+}
+
+// Event 'moveend' + 'zoomend' dipastikan sudah selesai sebelum signal
+// Event 'moveend' + 'zoomend' dipastikan sudah selesai sebelum signal
+map.whenReady(function() {
+  if (${isSolid}) {
+    // JIKA TEMA SOLID: Tunggu gambar satelit selesai didownload
+    var loaded = 0, total = 0;
+    map.on('tileloadstart', function() { total++; });
+    map.on('tileload tileerror', function() {
+      loaded++;
+      if (loaded >= total && total > 0) setTimeout(signal, 500);
+    });
+    setTimeout(signal, 5000); // Failsafe maksimal 5 detik
+  } else {
+    // JIKA TEMA TRANSPARAN: Tidak ada satelit, beri waktu 0.8 detik untuk render garis, lalu signal!
+    setTimeout(signal, 800);
+  }
+});
+</script>
+</body>
+</html>`;
 };

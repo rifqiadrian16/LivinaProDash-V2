@@ -186,6 +186,23 @@ export default function useDashboard() {
       let parsed = existing ? JSON.parse(existing) : [];
       const topSpeed = Math.max(...allData.map((d) => d.speed));
       const fuelUsed = runningStats.current.fuel.toFixed(1);
+      let peakAlt = 0;
+      let totalClimb = 0;
+      let previousAlt: number | null = null;
+
+      allData.forEach((point) => {
+        const currentAlt = point.altitude || 0;
+
+        if (currentAlt > peakAlt) {
+          peakAlt = currentAlt;
+        }
+
+        if (previousAlt !== null && currentAlt > previousAlt) {
+          totalClimb += currentAlt - previousAlt;
+        }
+        previousAlt = currentAlt;
+      });
+      // +++++++++++++++++++++++++++++++++++++++++++++
 
       const defaultName = `Livina Drive (${new Date().toLocaleTimeString()})`;
 
@@ -212,6 +229,10 @@ export default function useDashboard() {
             Math.round(runningStats.current.fuel * 10000).toLocaleString(
               "id-ID",
             ),
+          // +++ TAMBAHKAN KE DALAM DETAILS +++
+          peakAlt: Math.round(peakAlt).toString(),
+          climb: Math.round(totalClimb).toString(),
+          // ++++++++++++++++++++++++++++++++++
         },
         routeData: allData,
       };
@@ -351,6 +372,7 @@ export default function useDashboard() {
       tripDataRef.current.push({
         latitude: latestLocation.current?.latitude || 0,
         longitude: latestLocation.current?.longitude || 0,
+        altitude: latestLocation.current?.altitude || 0,
         speed: newData.s,
         rpm: newData.r,
         temp: newData.t,

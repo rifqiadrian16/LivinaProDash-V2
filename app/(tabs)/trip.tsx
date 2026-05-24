@@ -12,7 +12,7 @@ import {
   ScrollView,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import {
   SafeAreaView,
@@ -32,6 +32,10 @@ export default function TripScreen() {
   const [playbackIndex, setPlaybackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const webViewRef = useRef<WebView>(null);
+  const [playbackMapType, setPlaybackMapType] = useState<
+    "dark" | "normal" | "satellite"
+  >("dark");
+  const [isScrollEnabled, setIsScrollEnabled] = useState(true);
 
   // State untuk Share Modal Pamer Rute
   const [shareTripData, setShareTripData] = useState<any>(null);
@@ -129,6 +133,9 @@ export default function TripScreen() {
 
   const injectDummyData = async () => {
     const dummyTrips = [
+      // ---------------------------------------------------------
+      // RUTE 1: CIKIDANG (EKSTREM & ZIG-ZAG)
+      // ---------------------------------------------------------
       {
         id: "dummy-trip-cikidang",
         date: "24 Mei 2026, 07:15",
@@ -142,9 +149,10 @@ export default function TripScreen() {
           maxRpm: "4500",
           fuelUsed: "3.2",
           cost: "Rp 32.000",
+          peakAlt: "850",
+          climb: "720",
         },
         routeData: [
-          // Start: Cibadak
           {
             time: "07:15",
             latitude: -6.89,
@@ -160,7 +168,6 @@ export default function TripScreen() {
             throttle: 15,
             note: "Start Cibadak",
           },
-          // Masuk Cikidang (Mulai Nanjak)
           {
             time: "07:25",
             latitude: -6.905,
@@ -176,9 +183,6 @@ export default function TripScreen() {
             throttle: 25,
             note: "Masuk Jalur Alternatif",
           },
-
-          // --- MULAI ZIG-ZAG EKSTREM (MELIAK-LIUK) ---
-          // Tikungan Tajam 1 (Ke Utara/Kanan)
           {
             time: "07:35",
             latitude: -6.895,
@@ -194,7 +198,6 @@ export default function TripScreen() {
             throttle: 45,
             note: "Hairpin 1 - Gaspol",
           },
-          // Tikungan Tajam 2 (Banting Selatan/Kiri)
           {
             time: "07:42",
             latitude: -6.915,
@@ -210,7 +213,6 @@ export default function TripScreen() {
             throttle: 20,
             note: "Turunan Pendek",
           },
-          // Tikungan Tajam 3 (Banting Utara/Kanan - Tanjakan Curam)
           {
             time: "07:50",
             latitude: -6.905,
@@ -226,7 +228,6 @@ export default function TripScreen() {
             throttle: 60,
             note: "Hairpin 2 - Tanjakan Curam",
           },
-          // Tikungan Tajam 4 (Banting Selatan/Kiri)
           {
             time: "07:58",
             latitude: -6.925,
@@ -242,7 +243,6 @@ export default function TripScreen() {
             throttle: 18,
             note: "Jalan Agak Lurus",
           },
-          // Tikungan Tajam 5 (Banting Utara/Kanan - Puncak Cikidang)
           {
             time: "08:05",
             latitude: -6.91,
@@ -258,9 +258,6 @@ export default function TripScreen() {
             throttle: 70,
             note: "Puncak Cikidang",
           },
-          // ------------------------------------------
-
-          // Turunan Panjang ke Pelabuhan Ratu (Engine Brake)
           {
             time: "08:15",
             latitude: -6.94,
@@ -276,7 +273,6 @@ export default function TripScreen() {
             throttle: 0,
             note: "Engine Brake Turunan",
           },
-          // Finish: Pelabuhan Ratu
           {
             time: "08:25",
             latitude: -6.98,
@@ -294,11 +290,117 @@ export default function TripScreen() {
           },
         ],
       },
+      // ---------------------------------------------------------
+      // RUTE 2: SITU GUNUNG (KOTA -> PEGUNUNGAN)
+      // ---------------------------------------------------------
+      {
+        id: "dummy-trip-situgunung",
+        date: "25 Mei 2026, 09:00",
+        route: "Jalur Wisata Situ Gunung",
+        distance: "15.2 km",
+        time: "45m",
+        fuel: "1.5 L",
+        ecoScore: 82, // Hijau/Bagus karena lari konstan walau nanjak
+        details: {
+          topSpeed: "60",
+          maxRpm: "3000",
+          fuelUsed: "1.5",
+          cost: "Rp 15.000",
+          peakAlt: "1050", // Situ Gunung lebih tinggi (meter)
+          climb: "540",
+        },
+        routeData: [
+          // Start: Kota
+          {
+            time: "09:00",
+            latitude: -6.925,
+            longitude: 106.925,
+            speed: 20,
+            rpm: 1500,
+            temp: 82,
+            instFuel: 10.0,
+            iat: 35,
+            maf: 10.5,
+            stft: 2,
+            timing: 12,
+            throttle: 10,
+            note: "Start Pusat Kota",
+          },
+          // Lewat Cisaat (Macet dikit)
+          {
+            time: "09:15",
+            latitude: -6.915,
+            longitude: 106.905,
+            speed: 30,
+            rpm: 1800,
+            temp: 88,
+            instFuel: 11.5,
+            iat: 36,
+            maf: 12.1,
+            stft: 1,
+            timing: 14,
+            throttle: 12,
+            note: "Lalin Padat Cisaat",
+          },
+          // Belok Kanan Polsek Kadudampit (Mulai Nanjak)
+          {
+            time: "09:25",
+            latitude: -6.895,
+            longitude: 106.9,
+            speed: 45,
+            rpm: 2500,
+            temp: 90,
+            instFuel: 8.5,
+            iat: 32,
+            maf: 18.0,
+            stft: 0,
+            timing: 20,
+            throttle: 25,
+            note: "Masuk Kadudampit",
+          },
+          // Tanjakan Panjang Kadudampit (Udara mulai dingin)
+          {
+            time: "09:35",
+            latitude: -6.865,
+            longitude: 106.91,
+            speed: 40,
+            rpm: 3000,
+            temp: 93,
+            instFuel: 7.0,
+            iat: 28,
+            maf: 22.5,
+            stft: 4,
+            timing: 25,
+            throttle: 35,
+            note: "Tanjakan Konsisten",
+          },
+          // Finish: Parkiran Situ Gunung (Udara sangat dingin)
+          {
+            time: "09:45",
+            latitude: -6.835,
+            longitude: 106.92,
+            speed: 10,
+            rpm: 800,
+            temp: 90,
+            instFuel: 0.0,
+            iat: 24,
+            maf: 3.5,
+            stft: 0,
+            timing: 8,
+            throttle: 5,
+            note: "Tiba di Situ Gunung",
+          },
+        ],
+      },
     ];
 
     try {
       await AsyncStorage.setItem("@livina_trips", JSON.stringify(dummyTrips));
-      showAlert("SUKSES", "Data Jalur Cikidang disuntikkan!", "success");
+      showAlert(
+        "SUKSES",
+        "Data Jalur Cikidang & Situ Gunung berhasil disuntikkan!",
+        "success",
+      );
       syncTrips();
     } catch (error) {
       console.error(error);
@@ -511,6 +613,7 @@ export default function TripScreen() {
           {selectedTrip && (
             <ScrollView
               style={styles.modalContent}
+              scrollEnabled={isScrollEnabled}
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.modalHeader}>
@@ -563,12 +666,70 @@ export default function TripScreen() {
                 </View>
               </View>
 
+              <View
+                style={{
+                  flexDirection: "row",
+                  gap: 10,
+                  paddingHorizontal: 20,
+                  marginBottom: 15,
+                  justifyContent: "center",
+                }}
+              >
+                {(["dark", "normal", "satellite"] as const).map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    onPress={() => setPlaybackMapType(type)}
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 6,
+                      borderRadius: 20,
+                      backgroundColor:
+                        playbackMapType === type ? "#00ffcc" : "#333",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: "bold",
+                        textTransform: "uppercase",
+                        color: playbackMapType === type ? "#121212" : "#fff",
+                      }}
+                    >
+                      {type}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
               {/* AREA MAPS INTERAKTIF */}
-              <View style={styles.mapContainer}>
+              <View
+                style={styles.mapContainer}
+                onTouchStart={(e) => {
+                  if (e.nativeEvent.touches.length > 1)
+                    setIsScrollEnabled(false);
+                }}
+                onTouchMove={(e) => {
+                  // Evaluasi ulang terus menerus saat jari bergerak
+                  if (e.nativeEvent.touches.length > 1) {
+                    setIsScrollEnabled(false);
+                  } else {
+                    setIsScrollEnabled(true);
+                  }
+                }}
+                onTouchEnd={(e) => {
+                  // Gembok HANYA DIBUKA jika jari yang menempel kurang dari 2
+                  if (e.nativeEvent.touches.length < 2)
+                    setIsScrollEnabled(true);
+                }}
+                onTouchCancel={(e) => {
+                  if (e.nativeEvent.touches.length < 2)
+                    setIsScrollEnabled(true);
+                }}
+              >
                 <WebView
                   ref={webViewRef}
                   style={styles.map}
-                  source={{ html: getMapHtml(selectedTrip) }}
+                  source={{ html: getMapHtml(selectedTrip, playbackMapType) }}
                   scrollEnabled={false}
                   showsVerticalScrollIndicator={false}
                   showsHorizontalScrollIndicator={false}

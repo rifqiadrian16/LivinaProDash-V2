@@ -1,8 +1,14 @@
 // components/trip/ShareModal.tsx
 import { Ionicons } from "@expo/vector-icons";
 import * as MediaLibrary from "expo-media-library";
-import React, { useRef, useState } from "react";
-import { Modal, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Modal,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import ViewShot from "react-native-view-shot";
 import { WebView } from "react-native-webview";
 import { tripStyles as styles } from "../../styles/trip.styles";
@@ -24,10 +30,25 @@ export default function ShareModal({
   const [shareTheme, setShareTheme] = useState<"solid" | "transparent">(
     "solid",
   );
+  const [isMapReady, setIsMapReady] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const shareCardRef = useRef<ViewShot>(null);
 
+  useEffect(() => {
+    if (!visible) {
+      setIsMapReady(false);
+      setIsSaving(false);
+    }
+  }, [visible]);
+
   const downloadToDevice = async () => {
+    if (!isMapReady) {
+      showAlert("TUNGGU", "Peta masih dimuat, coba lagi sebentar.", "error");
+      return;
+    }
+
     try {
+      setIsSaving(true);
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== "granted") {
         showAlert(
@@ -35,8 +56,12 @@ export default function ShareModal({
           "Izinkan akses galeri untuk menyimpan gambar.",
           "error",
         );
+        setIsSaving(false);
         return;
       }
+
+      // Delay ekstra agar WebView benar-benar selesai paint setelah signal
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
       if (shareCardRef.current?.capture) {
         const uri = await shareCardRef.current.capture();
@@ -48,7 +73,9 @@ export default function ShareModal({
         );
       }
     } catch (err) {
-      showAlert("ERROR", "Gagal menyimpan gambar ke galeri.", "error");
+      showAlert("ERROR", "Gagal menyimpan gambar: " + String(err), "error");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -71,7 +98,10 @@ export default function ShareModal({
                 styles.themeBtn,
                 shareTheme === "solid" && styles.themeBtnActive,
               ]}
-              onPress={() => setShareTheme("solid")}
+              onPress={() => {
+                setShareTheme("solid");
+                setIsMapReady(false);
+              }}
             >
               <Text
                 style={[
@@ -87,7 +117,10 @@ export default function ShareModal({
                 styles.themeBtn,
                 shareTheme === "transparent" && styles.themeBtnActive,
               ]}
-              onPress={() => setShareTheme("transparent")}
+              onPress={() => {
+                setShareTheme("transparent");
+                setIsMapReady(false);
+              }}
             >
               <Text
                 style={[
@@ -100,17 +133,42 @@ export default function ShareModal({
             </TouchableOpacity>
           </View>
 
+          {/* Indikator loading peta */}
+          {!isMapReady && (
+            <View
+              style={{
+                position: "absolute",
+                top: 160,
+                left: 0,
+                right: 0,
+                alignItems: "center",
+                zIndex: 10,
+              }}
+            >
+              <ActivityIndicator size="small" color="#FC4C02" />
+            </View>
+          )}
+
           <ViewShot
             ref={shareCardRef}
-            options={{ format: "png", quality: 1.0 }}
-            style={styles.captureArea}
+            options={{ format: "png", quality: 1.0, result: "tmpfile" }}
+            style={{ width: 270, height: 460, overflow: "hidden" }}
           >
             <WebView
               source={{ html: getShareCardHtml(tripData, shareTheme) }}
-              style={styles.shareWebView}
+              style={{
+                width: 270,
+                height: 460,
+                backgroundColor: "transparent",
+              }}
               scrollEnabled={false}
               bounces={false}
               originWhitelist={["*"]}
+              onMessage={(e) => {
+                if (e.nativeEvent.data === "MAP_READY") {
+                  setIsMapReady(true);
+                }
+              }}
             />
           </ViewShot>
 
@@ -119,16 +177,34 @@ export default function ShareModal({
               <Text style={styles.shareCancelText}>Batal</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.shareSubmitBtn}
+              style={[
+                styles.shareSubmitBtn,
+                (!isMapReady || isSaving) && { opacity: 0.5 },
+              ]}
               onPress={downloadToDevice}
+              disabled={!isMapReady || isSaving}
             >
-              <Ionicons
-                name="download-outline"
-                size={20}
-                color="#111"
-                style={{ marginRight: 6 }}
-              />
-              <Text style={styles.shareSubmitText}>Simpan ke Galeri</Text>
+              {isSaving ? (
+                <ActivityIndicator
+                  size="small"
+                  color="#111"
+                  style={{ marginRight: 6 }}
+                />
+              ) : (
+                <Ionicons
+                  name="download-outline"
+                  size={20}
+                  color="#111"
+                  style={{ marginRight: 6 }}
+                />
+              )}
+              <Text style={styles.shareSubmitText}>
+                {isSaving
+                  ? "Menyimpan..."
+                  : isMapReady
+                    ? "Simpan ke Galeri"
+                    : "Memuat Peta..."}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
