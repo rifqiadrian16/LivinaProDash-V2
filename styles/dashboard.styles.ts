@@ -248,7 +248,11 @@ export const styles = StyleSheet.create({
   },
   fuelValue: { color: "#fff", fontSize: 20, fontWeight: "bold", marginTop: 5 },
   unitSmall: { fontSize: 10, color: "#666" },
-  recordFabActive: { backgroundColor: "#ff4444" },
+  recordFabActive: {
+    backgroundColor: "#1a1a1a", // Berubah gelap saat sedang merekam
+    borderWidth: 2,
+    borderColor: "#FF1744",
+  },
   recordingDot: {
     position: "absolute",
     top: 15,
@@ -260,16 +264,20 @@ export const styles = StyleSheet.create({
   },
   recordFabContainer: {
     position: "absolute",
-    right: 0, // Tempel ke paling kanan
-    bottom: 30,
+    bottom: 90,
+    right: 8,
+    zIndex: 999,
   },
   recordFab: {
-    width: 65,
-    height: 65,
-    borderRadius: 32.5,
-    backgroundColor: "#00ff88",
+    width: 60, // Sedikit diperkecil agar lebih estetik
+    height: 60,
+    borderRadius: 30, // Harus persis setengah dari lebar/tinggi agar BULAT SEMPURNA
+    backgroundColor: "#00ff88", // Merah Premium khas tombol Record
     justifyContent: "center",
     alignItems: "center",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
     elevation: 8,
   },
   secretZone: {

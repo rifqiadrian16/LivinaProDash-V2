@@ -38,7 +38,7 @@ export default function DashboardScreen() {
       return (
         <ScrollView
           style={styles.container}
-          contentContainerStyle={{ paddingBottom: 120 }}
+          contentContainerStyle={{ paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
         >
           <DashboardHeader

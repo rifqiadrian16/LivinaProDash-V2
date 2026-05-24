@@ -471,7 +471,7 @@ export default function TripScreen() {
         {/* Bungkus judul dan tombol dummy jadi satu baris */}
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <Text style={styles.headerTitle}>
-            TRIP <Text style={{ color: "#00cc00" }}>LOGS</Text>
+            TRIP <Text style={{ color: "#00ff88" }}>LOGS</Text>
           </Text>
 
           {/* TOMBOL DARURAT INJECT DUMMY */}

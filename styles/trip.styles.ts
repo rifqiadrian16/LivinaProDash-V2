@@ -2,7 +2,7 @@
 import { StyleSheet } from "react-native";
 
 export const tripStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#121212", padding: 15 },
+  container: { flex: 1, backgroundColor: "#000", padding: 15 },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
