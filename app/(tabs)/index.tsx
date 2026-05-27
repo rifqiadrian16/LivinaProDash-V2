@@ -50,7 +50,11 @@ export default function DashboardScreen() {
             isObdStandby={state.isObdStandby}
             onOpenTerminal={() => actions.setShowTerminal(true)}
           />
-          <MainGauges rpm={state.data.r} speed={state.data.s} />
+          <MainGauges
+            rpm={state.data.r}
+            speed={state.data.s}
+            transmission={state.transmission || "matic"}
+          />
           <DataGrid
             data={state.data}
             instFuel={state.instFuel}

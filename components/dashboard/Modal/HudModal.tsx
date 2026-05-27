@@ -2,6 +2,10 @@ import React from "react";
 import { Modal, Text, TouchableOpacity, View } from "react-native";
 import { styles } from "../../../styles/dashboard.styles";
 
+// +++ PASTIKAN PATH IMPORT HOOK INI SESUAI DENGAN STRUKTUR FOLDER MAS +++
+// Jika path-nya beda, sesuaikan titik-titiknya (../)
+import { useGearRatio } from "../../../hooks/useGearRatio";
+
 export default function HudModal({
   visible,
   onClose,
@@ -12,6 +16,11 @@ export default function HudModal({
   instFuel,
   avgFuel,
 }: any) {
+  // ================= PANGGIL JALUR NINJA DI SINI =================
+  // Kita suapkan data RPM (data.r) dan Speed (data.s) dari sensor HUD
+  const estimatedGear = useGearRatio(data.r, data.s, transmission);
+  // ===============================================================
+
   return (
     <Modal
       visible={visible}
@@ -69,44 +78,82 @@ export default function HudModal({
                 transform: [{ skewX: "-10deg" }],
               }}
             >
-              {/* Background track */}
+              {/* Background track (Dengan bayangan Redline permanen) */}
               <View
                 style={{
                   position: "absolute",
                   width: "100%",
                   height: 8,
-                  backgroundColor: "rgba(255,255,255,0.05)",
-                  borderRadius: 1,
                   top: 30,
-                }}
-              />
-
-              {/* Fill bar — SEMUA PUTIH, kecuali redline MERAH */}
-              <View
-                style={{
-                  position: "absolute",
-                  width: `${Math.min((data.r / 8000) * 100, 100)}%`,
-                  height: 8,
-                  top: 30,
+                  flexDirection: "row",
                   borderRadius: 1,
                   overflow: "hidden",
-                  shadowColor: "#ffffff",
-                  shadowOpacity: data.r > 0 ? 0.6 : 0,
-                  shadowRadius: 8,
-                  elevation: data.r > 0 ? 6 : 0,
                 }}
               >
+                {/* Track Normal (0 - 6500) = 81.25% dari total */}
                 <View
                   style={{
-                    width: "100%",
+                    width: "81.25%",
                     height: "100%",
-                    backgroundColor: data.r > 6500 ? "#ff3333" : "#ffffff",
-                    opacity: data.r > 0 ? 1 : 0.15,
+                    backgroundColor: "rgba(255,255,255,0.05)",
+                  }}
+                />
+                {/* Track Redline (6500 - 8000) = 18.75% dari total */}
+                <View
+                  style={{
+                    width: "18.75%",
+                    height: "100%",
+                    backgroundColor: "rgba(255,50,50,0.15)",
                   }}
                 />
               </View>
 
-              {/* Marker setiap 1000 RPM — SEMUA PUTIH PUDAR */}
+              {/* Fill bars (Terbagi dua: Putih dan Merah) */}
+              <View
+                style={{
+                  position: "absolute",
+                  top: 30,
+                  left: 0,
+                  height: 8,
+                  flexDirection: "row",
+                  width: "100%",
+                }}
+              >
+                {/* Bar Putih Utama (Mentok di 6500 RPM) */}
+                <View
+                  style={{
+                    height: "100%",
+                    width: `${(Math.min(data.r, 6500) / 8000) * 100}%`,
+                    backgroundColor: "#ffffff",
+                    borderTopLeftRadius: 1,
+                    borderBottomLeftRadius: 1,
+                    shadowColor: "#ffffff",
+                    shadowOpacity: data.r > 0 ? 0.6 : 0,
+                    shadowRadius: 8,
+                    elevation: data.r > 0 ? 6 : 0,
+                    opacity: data.r > 0 ? 1 : 0.15,
+                  }}
+                />
+
+                {/* Bar Merah Redline (Hanya muncul jika RPM di atas 6500) */}
+                {data.r > 6500 && (
+                  <View
+                    style={{
+                      height: "100%",
+                      width: `${(Math.min(data.r - 6500, 1500) / 8000) * 100}%`,
+                      backgroundColor: "#ff3333",
+                      borderTopRightRadius: 1,
+                      borderBottomRightRadius: 1,
+                      shadowColor: "#ff3333",
+                      shadowOpacity: 0.8,
+                      shadowRadius: 8,
+                      elevation: 6,
+                    }}
+                  />
+                )}
+              </View>
+
+              {/* Marker setiap 1000 RPM */}
               {[...Array(9)].map((_, i) => (
                 <View
                   key={`marker-${i}`}
@@ -127,14 +174,14 @@ export default function HudModal({
                 />
               ))}
 
-              {/* Angka RPM 0-8 — SEMUA PUTIH PUDAR, aktif PUTIH TERANG */}
+              {/* Angka RPM 0-8 */}
               {[...Array(9)].map((_, i) => (
                 <Text
                   key={`num-${i}`}
                   style={{
                     position: "absolute",
                     left: `${(i / 8) * 100}%`,
-                    top: 0,
+                    top: 5,
                     color:
                       data.r >= i * 1000
                         ? i >= 7
@@ -151,12 +198,12 @@ export default function HudModal({
                 </Text>
               ))}
 
-              {/* Label ×1000 rpm — PUTIH PUDAR */}
+              {/* Label ×1000 rpm */}
               <Text
                 style={{
                   position: "absolute",
                   right: 0,
-                  top: 15,
+                  top: 45,
                   color: "rgba(255,255,255,0.25)",
                   fontSize: 9,
                   fontWeight: "bold",
@@ -167,16 +214,16 @@ export default function HudModal({
                 ×1000 rpm
               </Text>
 
-              {/* Redline zone — GARIS MERAH TIPIS SAJA */}
+              {/* Redline zone pembatas (Di-update ke 18.75% untuk area 6500-8000) */}
               <View
                 style={{
                   position: "absolute",
                   right: 0,
                   top: 24,
-                  width: "12.5%",
+                  width: "18.75%",
                   height: 20,
                   borderLeftWidth: 1,
-                  borderLeftColor: "rgba(255,50,50,0.3)",
+                  borderLeftColor: "rgba(255,50,50,0.5)",
                 }}
               />
             </View>
@@ -194,7 +241,7 @@ export default function HudModal({
               width: "100%",
             }}
           >
-            {/* KIRI: TRANSMISI */}
+            {/* KIRI: INDIKATOR GIGI (DINAMIS DARI JALUR NINJA) */}
             <View
               style={{ flex: 1, alignItems: "flex-start", paddingBottom: 12 }}
             >
@@ -207,7 +254,8 @@ export default function HudModal({
                   opacity: 0.9,
                 }}
               >
-                {transmission === "manual" ? "M" : "D"}
+                {/* Menampilkan estimasi gigi (P/N, 1, 2, 3, 4) */}
+                {estimatedGear}
               </Text>
               <Text
                 style={{
@@ -218,7 +266,7 @@ export default function HudModal({
                   marginTop: -2,
                 }}
               >
-                {transmission === "manual" ? "MANUAL" : "AUTO"}
+                GEAR
               </Text>
             </View>
 
@@ -262,7 +310,7 @@ export default function HudModal({
           </View>
 
           {/* -------------------------------------------------
-          BAGIAN BAWAH: INFO GRID (SEMUA PUTIH, WARNING MERAH)
+          BAGIAN BAWAH: INFO GRID
           ------------------------------------------------- */}
           <View
             style={{
@@ -395,7 +443,7 @@ export default function HudModal({
           </View>
 
           {/* -------------------------------------------------
-          SHIFT LIGHT (MANUAL ONLY) — PUTIH PUDAR → MERAH
+          SHIFT LIGHT (DIPERTAHANKAN UNTUK MODE MANUAL)
           ------------------------------------------------- */}
           {transmission === "manual" && (
             <View

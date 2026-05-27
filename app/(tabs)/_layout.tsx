@@ -39,11 +39,13 @@ export default function TabLayout() {
               <View
                 style={[
                   styles.blurContainer,
-                  isDark ? styles.bgDark : styles.bgLight,
+                  // isDark ? styles.bgDark : styles.bgLight,
+                  styles.bgDark,
                 ]}
               >
                 <BlurView
-                  tint={isDark ? "dark" : "light"}
+                  // tint={isDark ? "dark" : "light"}
+                  tint={"dark"}
                   intensity={80}
                   style={StyleSheet.absoluteFill}
                 />
