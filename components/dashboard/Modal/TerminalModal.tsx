@@ -88,6 +88,14 @@ export default function TerminalModal({
           ))}
         </ScrollView>
 
+        <TouchableOpacity
+          style={styles.testButton}
+          onPress={() => onSend("TEST_RELAY")}
+        >
+          <Ionicons name="hardware-chip-outline" size={20} color="#fff" />
+          <Text style={styles.testButtonText}>TEST RELAY PCB</Text>
+        </TouchableOpacity>
+
         {/* INPUT AREA */}
         <View style={styles.inputArea}>
           <Text style={styles.prompt}>$</Text>
@@ -141,4 +149,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   input: { flex: 1, color: "#00ff88", fontFamily: "monospace", fontSize: 16 },
+  testButton: {
+    backgroundColor: "#ff3333", // Merah menyala
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 12,
+    borderRadius: 6,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#ff6666",
+  },
+  testButtonText: {
+    color: "#ffffff",
+    fontWeight: "900",
+    fontFamily: "monospace",
+    fontSize: 16,
+    marginLeft: 8,
+    letterSpacing: 1,
+  },
 });

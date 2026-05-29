@@ -1,5 +1,5 @@
-import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { Animated, StyleSheet, Text, View } from "react-native";
 import Svg, {
   Circle,
   G,
@@ -21,24 +21,49 @@ export default function MainGauges({
   rpm = 0,
   transmission = "matic",
 }: MainGaugesProps) {
-  // Konfigurasi Batas RPM
   const MAX_RPM = 8000;
   const REDLINE_RPM = 6500;
 
-  const isRedline = rpm >= REDLINE_RPM;
-  const safeRpm = Math.min(Math.max(rpm, 0), MAX_RPM);
+  // === PERBAIKAN: STATE ANIMASI SMOOTH ===
+  const [animRpm, setAnimRpm] = useState(rpm);
+  const [animSpeed, setAnimSpeed] = useState(speed);
+  const rpmValue = useRef(new Animated.Value(rpm)).current;
+  const speedValue = useRef(new Animated.Value(speed)).current;
 
-  // --- MATEMATIKA SETENGAH LINGKARAN (SEMI-CIRCLE) ---
+  // Trigger animasi saat prop berubah
+  useEffect(() => {
+    Animated.timing(rpmValue, {
+      toValue: rpm,
+      duration: 250,
+      useNativeDriver: false,
+    }).start();
+    Animated.timing(speedValue, {
+      toValue: speed,
+      duration: 250,
+      useNativeDriver: false,
+    }).start();
+  }, [rpm, speed]);
+
+  // Pantau nilai animasi untuk di-render ke SVG
+  useEffect(() => {
+    const rSub = rpmValue.addListener((v) => setAnimRpm(v.value));
+    const sSub = speedValue.addListener((v) => setAnimSpeed(v.value));
+    return () => {
+      rpmValue.removeListener(rSub);
+      speedValue.removeListener(sSub);
+    };
+  }, []);
+
+  const isRedline = animRpm >= REDLINE_RPM;
+  const safeRpm = Math.min(Math.max(animRpm, 0), MAX_RPM);
+
   const cx = 160;
   const cy = 160;
   const radius = 145;
   const strokeWidth = 3;
-
-  // Sudut 180 derajat (Dari Jam 9 ke Jam 3)
   const startAngle = -90;
   const sweepAngle = 180;
   const endAngle = startAngle + (safeRpm / MAX_RPM) * sweepAngle;
-
   const redlineStartAngle = startAngle + (REDLINE_RPM / MAX_RPM) * sweepAngle;
 
   const polarToCartesian = (
@@ -60,25 +85,21 @@ export default function MainGauges({
     return `M ${startPoint.x} ${startPoint.y} A ${r} ${r} 0 0 1 ${endPoint.x} ${endPoint.y}`;
   };
 
-  // Jalur SVG
   const backgroundTrack = dArc(startAngle, startAngle + sweepAngle, radius);
   const redlineTrack = dArc(redlineStartAngle, startAngle + sweepAngle, radius);
   const activeTrack = safeRpm > 0 ? dArc(startAngle, endAngle, radius) : "";
-  const estimatedGear = useGearRatio(rpm, speed, transmission);
+  const estimatedGear = useGearRatio(animRpm, animSpeed, transmission); // Gear ngikutin RPM yang dianimasikan
 
   return (
     <View style={styles.container}>
       <View style={styles.gearContainer}>
         <Text style={styles.gearText}>{estimatedGear}</Text>
       </View>
-      {/* ================= CLUSTER METER SETENGAH LINGKARAN ================= */}
       <View style={styles.gaugeCluster}>
         <Svg width={cx * 2} height={190} style={styles.svgGauge}>
-          {/* 1. TICK MARKS & ANGKA RPM (0 - 7) */}
           {Array.from({ length: 9 }).map((_, i) => {
             const rot = startAngle + (i / 8) * sweepAngle;
             const isRedZone = i >= 7;
-
             const innerP = polarToCartesian(cx, cy, radius - 8, rot);
             const outerP = polarToCartesian(cx, cy, radius, rot);
             const textP = polarToCartesian(cx, cy, radius - 26, rot);
@@ -107,8 +128,6 @@ export default function MainGauges({
               </G>
             );
           })}
-
-          {/* 2. LINTASAN DASAR */}
           <Path
             d={backgroundTrack}
             fill="none"
@@ -116,8 +135,6 @@ export default function MainGauges({
             strokeWidth={strokeWidth}
             strokeLinecap="round"
           />
-
-          {/* 3. ZONA REDLINE */}
           <Path
             d={redlineTrack}
             fill="none"
@@ -125,8 +142,6 @@ export default function MainGauges({
             strokeWidth={strokeWidth}
             strokeLinecap="round"
           />
-
-          {/* 4. LINTASAN AKTIF */}
           {safeRpm > 0 && (
             <Path
               d={activeTrack}
@@ -137,7 +152,6 @@ export default function MainGauges({
             />
           )}
 
-          {/* 5. JARUM RPM ELEGAN */}
           <G transform={`rotate(${endAngle}, ${cx}, ${cy})`}>
             <Polygon
               points={`${cx - 2},${cy} ${cx},${cy - radius + 15} ${cx + 2},${cy} ${cx},${cy + 15}`}
@@ -152,18 +166,16 @@ export default function MainGauges({
             <Circle cx={cx} cy={cy} r={2} fill="#000" />
           </G>
         </Svg>
-
-        {/* ================= DIGITAL SPEED (DI TENGAH LENGKUNGAN) ================= */}
         <View style={styles.speedContainer} pointerEvents="none">
-          <Text style={styles.speedDigits}>{Math.round(speed)}</Text>
+          {/* Angka speed sekarang mengikuti animasi yang halus */}
+          <Text style={styles.speedDigits}>{Math.round(animSpeed)}</Text>
           <Text style={styles.speedUnit}>KM/H</Text>
         </View>
       </View>
-
-      {/* ================= DIGITAL RPM (DI LUAR/BAWAH LENGKUNGAN) ================= */}
       <View style={styles.rpmContainer}>
+        {/* Angka RPM text di bawah lengkungan ikut animasinya */}
         <Text style={[styles.rpmValue, isRedline && styles.textRed]}>
-          {Math.round(rpm).toLocaleString("id-ID")}{" "}
+          {Math.round(animRpm).toLocaleString("id-ID")}{" "}
           <Text style={styles.rpmUnit}>RPM</Text>
         </Text>
       </View>
@@ -178,21 +190,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 10,
   },
-
-  /* --- HOUSING SETENGAH LINGKARAN --- */
   gaugeCluster: {
     width: 320,
     height: 190,
     alignItems: "center",
     position: "relative",
   },
-  svgGauge: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-  },
-
-  /* --- KAWASAN KELAJUAN (SPEED) DI DALAM --- */
+  svgGauge: { position: "absolute", top: 0, left: 0 },
   speedContainer: {
     position: "absolute",
     bottom: 50,
@@ -218,8 +222,6 @@ const styles = StyleSheet.create({
     letterSpacing: 4,
     marginTop: -2,
   },
-
-  /* --- KAWASAN RPM (DI BAWAH) --- */
   rpmContainer: {
     marginTop: -10,
     alignItems: "center",
@@ -241,14 +243,13 @@ const styles = StyleSheet.create({
   textRed: { color: "#FF3B30" },
   gearContainer: {
     position: "absolute",
-    top: -20, // Mengambang pas di rongga atas lengkungan
-    backgroundColor: "rgba(15, 15, 15, 0.8)", // Background gelap transparan
+    top: -20,
+    backgroundColor: "rgba(15, 15, 15, 0.8)",
     paddingHorizontal: 16,
     paddingVertical: 4,
-    borderRadius: 8, // Sedikit membulat
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#333333", // Border tipis elegan
-    // Efek shadow agar emblemnya menonjol
+    borderColor: "#333333",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.5,
@@ -257,8 +258,8 @@ const styles = StyleSheet.create({
   },
   gearText: {
     fontSize: 18,
-    fontWeight: "900", // Sangat tebal
-    color: "#FF3B30", // Warna Cyan Premium (atau bisa diganti merah #FF3B30)
+    fontWeight: "900",
+    color: "#FF3B30",
     letterSpacing: 2,
     fontVariant: ["tabular-nums"],
   },

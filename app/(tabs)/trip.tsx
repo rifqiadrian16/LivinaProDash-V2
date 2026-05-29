@@ -116,16 +116,23 @@ export default function TripScreen() {
     try {
       const storedTrips = await AsyncStorage.getItem("@livina_trips");
       if (storedTrips !== null) {
-        setTripHistory(JSON.parse(storedTrips));
+        try {
+          setTripHistory(JSON.parse(storedTrips));
+        } catch (parseError) {
+          console.log("🚨 Data trip korup ditemukan. Membersihkan file...");
+          await AsyncStorage.removeItem("@livina_trips");
+          setTripHistory([]);
+          showAlert(
+            "SYSTEM RECOVERY",
+            "Sistem mendeteksi dan membersihkan data yang rusak akibat Force Close.",
+            "error",
+          );
+        }
       } else {
         setTripHistory([]);
       }
     } catch (error) {
-      showAlert(
-        "GAGAL SINKRONISASI",
-        "Tidak dapat memuat data perjalanan dari memori HP.",
-        "error",
-      );
+      showAlert("GAGAL SINKRONISASI", "Tidak dapat memuat data.", "error");
     } finally {
       setTimeout(() => setIsSyncing(false), 1000);
     }

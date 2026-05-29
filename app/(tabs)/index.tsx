@@ -158,7 +158,7 @@ export default function DashboardScreen() {
       {/* AREA SENTUH RAHASIA OTA */}
       <TouchableOpacity
         activeOpacity={1}
-        style={styles.secretZone}
+        style={[styles.secretZone]}
         onPress={actions.handleSecretOtaTrigger}
       />
 

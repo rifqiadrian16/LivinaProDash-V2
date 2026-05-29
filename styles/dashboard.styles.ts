@@ -282,7 +282,8 @@ export const styles = StyleSheet.create({
   },
   secretZone: {
     position: "absolute",
-    bottom: 0,
+    bottom: 70,
+    width: "80%",
     left: 0,
     right: 0,
     height: 60, // Menutupi area Tab Bar Dashboard

@@ -11,7 +11,6 @@ import useBLE from "./useBLE";
 export default function useDashboard() {
   const { showAlert } = useAlert();
 
-  // --- 1. UI STATE ---
   const [isHudMode, setIsHudMode] = useState(false);
   const [isNightTime, setIsNightTime] = useState(false);
   const [transmission, setTransmission] = useState<"manual" | "matic" | null>(
@@ -19,18 +18,15 @@ export default function useDashboard() {
   );
   const [showTransModal, setShowTransModal] = useState(false);
 
-  // --- 2. OTA & BYPASS STATE ---
   const [otaTapCount, setOtaTapCount] = useState(0);
   const [showOTAModal, setShowOTAModal] = useState(false);
   const lastTapTime = useRef(0);
   const [isBypassed, setIsBypassed] = useState(false);
   const [bypassTapCount, setBypassTapCount] = useState(0);
 
-  // --- 3. HUD TAP STATE ---
   const [hudTapCount, setHudTapCount] = useState(0);
   const hudTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // --- 4. SENSOR DATA STATE ---
   const [data, setData] = useState({
     s: 0,
     r: 0,
@@ -55,11 +51,9 @@ export default function useDashboard() {
   const runningStats = useRef({ distance: 0, fuel: 0, startTime: 0 });
   const isRecordingRef = useRef(isRecording);
 
-  // --- 4b. SAVE TRIP MODAL STATE ---
   const [showSaveTripModal, setShowSaveTripModal] = useState(false);
   const pendingTripName = useRef("");
 
-  // --- 5. SETTINGS STATE ---
   const [showSettings, setShowSettings] = useState(false);
   const [obdType, setObdType] = useState<"bluetooth" | "wifi">("bluetooth");
   const [obdMac, setObdMac] = useState("");
@@ -78,7 +72,6 @@ export default function useDashboard() {
   >("disconnected");
   const [isObdStandby, setIsObdStandby] = useState(false);
 
-  // --- 6. RADAR & ALERT STATE ---
   const [showScanner, setShowScanner] = useState(false);
   const [scannedDevices, setScannedDevices] = useState<
     { name: string; mac: string }[]
@@ -94,7 +87,6 @@ export default function useDashboard() {
     onConfirm: () => {},
   });
 
-  // --- 7. TERMINAL STATE ---
   const [showTerminal, setShowTerminal] = useState(false);
   const [terminalLogs, setTerminalLogs] = useState<string[]>([
     "LivinaProDash OBD Terminal v1.0",
@@ -102,7 +94,6 @@ export default function useDashboard() {
     "--------------------------------",
   ]);
 
-  // --- FAB ANIMATION ---
   const fabX = useRef(new Animated.Value(45)).current;
   const [isFabOpen, setIsFabOpen] = useState(false);
 
@@ -126,7 +117,6 @@ export default function useDashboard() {
     }),
   ).current;
 
-  // --- LOAD INIT DATA ---
   useEffect(() => {
     const loadInitData = async () => {
       const hour = new Date().getHours();
@@ -148,7 +138,6 @@ export default function useDashboard() {
     loadInitData();
   }, []);
 
-  // --- LOCATION TRACKER ---
   useEffect(() => {
     let sub: ExpoLocation.LocationSubscription | undefined;
     const startWatching = async () => {
@@ -171,19 +160,36 @@ export default function useDashboard() {
     };
   }, []);
 
-  // --- TRIP DATA RECORDING LOGIC ---
   useEffect(() => {
     isRecordingRef.current = isRecording;
   }, [isRecording]);
 
+  // === PERBAIKAN: ANTI CORRUPT & ERROR HANDLING JSON ===
   const saveTripData = async (isFinal = false, tripName?: string) => {
-    if (tripDataRef.current.length < 5) return;
     try {
       const bufferRaw = await AsyncStorage.getItem("@livina_trip_buffer");
-      let buffer: any[] = bufferRaw ? JSON.parse(bufferRaw) : [];
+      let buffer: any[] = [];
+      if (bufferRaw) {
+        try {
+          buffer = JSON.parse(bufferRaw);
+        } catch (e) {
+          await AsyncStorage.removeItem("@livina_trip_buffer");
+        }
+      }
+
       const allData: any[] = buffer.concat(tripDataRef.current);
+      if (allData.length < 5) return; // Mencegah nyimpan trip kosong
+
       const existing = await AsyncStorage.getItem("@livina_trips");
-      let parsed = existing ? JSON.parse(existing) : [];
+      let parsed = [];
+      if (existing) {
+        try {
+          parsed = JSON.parse(existing);
+        } catch (e) {
+          await AsyncStorage.removeItem("@livina_trips");
+        }
+      }
+
       const topSpeed = Math.max(...allData.map((d) => d.speed));
       const fuelUsed = runningStats.current.fuel.toFixed(1);
       let peakAlt = 0;
@@ -192,20 +198,13 @@ export default function useDashboard() {
 
       allData.forEach((point) => {
         const currentAlt = point.altitude || 0;
-
-        if (currentAlt > peakAlt) {
-          peakAlt = currentAlt;
-        }
-
-        if (previousAlt !== null && currentAlt > previousAlt) {
+        if (currentAlt > peakAlt) peakAlt = currentAlt;
+        if (previousAlt !== null && currentAlt > previousAlt)
           totalClimb += currentAlt - previousAlt;
-        }
         previousAlt = currentAlt;
       });
-      // +++++++++++++++++++++++++++++++++++++++++++++
 
-      const defaultName = `Livina Drive (${new Date().toLocaleTimeString()})`;
-
+      const defaultName = `Livina Drive (${new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })})`;
       const newTrip = {
         id: currentTripId.current,
         date: new Date().toLocaleDateString("id-ID", {
@@ -229,10 +228,8 @@ export default function useDashboard() {
             Math.round(runningStats.current.fuel * 10000).toLocaleString(
               "id-ID",
             ),
-          // +++ TAMBAHKAN KE DALAM DETAILS +++
           peakAlt: Math.round(peakAlt).toString(),
           climb: Math.round(totalClimb).toString(),
-          // ++++++++++++++++++++++++++++++++++
         },
         routeData: allData,
       };
@@ -245,7 +242,9 @@ export default function useDashboard() {
       if (isFinal) await AsyncStorage.removeItem("@livina_trip_buffer");
       if (isFinal)
         showAlert("Trip Saved", "Riwayat perjalanan aman.", "success");
-    } catch (e) {}
+    } catch (e) {
+      console.log("[SAVE TRIP ERROR]", e);
+    }
   };
 
   const toggleRecording = () => {
@@ -255,14 +254,12 @@ export default function useDashboard() {
       currentTripId.current = Date.now().toString();
       lastUpdateTime.current = Date.now();
       lastSaveTime.current = Date.now();
-
       AsyncStorage.removeItem("@livina_trip_buffer").then(() => {
         setIsRecording(true);
         activateKeepAwakeAsync("recording");
         showAlert("Recording", "GPS & Telemetri aktif.", "success");
       });
     } else {
-      // 🔴 STOP REKAMAN — tampilkan modal nama dulu
       setIsRecording(false);
       deactivateKeepAwake("recording");
       setShowSaveTripModal(true);
@@ -271,9 +268,7 @@ export default function useDashboard() {
 
   const confirmSaveTrip = (tripName: string) => {
     setShowSaveTripModal(false);
-    saveTripData(true, tripName).catch((e) =>
-      console.log("[TRIP] Gagal simpan:", e),
-    );
+    saveTripData(true, tripName);
   };
 
   const discardTrip = () => {
@@ -283,19 +278,14 @@ export default function useDashboard() {
     showAlert("Dibatalkan", "Trip tidak disimpan.", "error");
   };
 
-  // --- BLE HANDLERS ---
   const handleRawText = (raw: string) => {
-    console.log("📡 [BALASAN ECU]:", raw);
-
-    // 👇 SUNTIKAN TERMINAL: Tangkap balasan RAW_RES
     if (raw.startsWith("RAW_RES:")) {
       const balasan = raw.substring(8);
       setTerminalLogs((prev) => [...prev, `ECU > ${balasan || "NO DATA"}`]);
-      return; // Stop di sini agar tidak memicu logic lain
+      return;
     }
-    if (raw === "STATUS:WAITING_MAC") {
-      setObdStatus("waiting_mac");
-    } else if (raw === "SCAN_STATUS:SCANNING") setIsSearchingOBD(true);
+    if (raw === "STATUS:WAITING_MAC") setObdStatus("waiting_mac");
+    else if (raw === "SCAN_STATUS:SCANNING") setIsSearchingOBD(true);
     else if (raw === "SCAN_STATUS:DONE") setIsSearchingOBD(false);
     else if (raw.startsWith("SCAN_FOUND:")) {
       const parts = raw.replace("SCAN_FOUND:", "").split("|");
@@ -316,22 +306,15 @@ export default function useDashboard() {
       if (config.autolock !== undefined) setAutoLock(config.autolock === "1");
       if (config.lockspeed !== undefined) setLockSpeed(config.lockspeed);
 
-      // 👇 3. INI GERBANG LALU LINTASNYA 👇
-      if (config.hasmac === "0") {
-        // Jika ESP32 bilang memorinya kosong, banting setir ke layar Setup!
-        setObdStatus("waiting_mac");
-      } else if (config.hasmac === "1" && obdStatus !== "ready") {
-        // Jika ESP32 bilang memorinya ada, baru boleh lanjut ke layar ECU!
+      if (config.hasmac === "0") setObdStatus("waiting_mac");
+      else if (config.hasmac === "1" && obdStatus !== "ready")
         setObdStatus("connecting_ecu");
-      }
     }
   };
 
   const updateData = (newData: any) => {
     setData(newData);
-    if (newData.v > 0 || newData.r > 0) {
-      setObdStatus("ready");
-    }
+    if (newData.v > 0 || newData.r > 0) setObdStatus("ready");
 
     const now = Date.now();
     const dt = (now - lastUpdateTime.current) / 3600000;
@@ -341,29 +324,21 @@ export default function useDashboard() {
     fuelFlow = fuelFlow * (1 + (newData.st + newData.lt) / 100);
 
     const isDFCO = newData.th === 0 && newData.s > 20 && newData.r > 1200;
-    if (isDFCO) {
-      fuelFlow = 0; // Injektor mati
-    }
+    if (isDFCO) fuelFlow = 0;
 
-    // --- 4. KALKULASI AVG FUEL (TOTAL DISTANCE / TOTAL FUEL) ---
     if (dt > 0 && dt < 0.003) {
-      // Abaikan lonjakan waktu saat pertama connect
       sessionStats.current.distance += newData.s * dt;
       sessionStats.current.fuel += fuelFlow * dt;
-
-      if (sessionStats.current.fuel > 0) {
+      if (sessionStats.current.fuel > 0)
         setAvgFuel(sessionStats.current.distance / sessionStats.current.fuel);
-      }
     }
 
-    // --- 5. LOGIC RECORDING KE DALAM RIWAYAT PERJALANAN ---
     if (isRecordingRef.current) {
       if (dt > 0 && dt < 0.003) {
         runningStats.current.distance += newData.s * dt;
         runningStats.current.fuel += fuelFlow * dt;
       }
 
-      // Hitung Inst Fuel khusus untuk rekaman CSV
       let recInst = 0.0;
       if (isDFCO) recInst = 99.9;
       else if (newData.s > 2 && fuelFlow > 0)
@@ -383,7 +358,7 @@ export default function useDashboard() {
         timing: newData.tm,
         volt: newData.v,
         throttle: newData.th,
-        instFuel: recInst.toFixed(1), // Simpan nilai Inst Fuel akurat
+        instFuel: recInst.toFixed(1),
         time: new Date().toLocaleTimeString("id-ID", {
           hour: "2-digit",
           minute: "2-digit",
@@ -397,22 +372,24 @@ export default function useDashboard() {
               : "Cruising",
       });
 
-      // (Logic buffer 500 dan autosave tetap aman di bawah sini...)
-      if (tripDataRef.current.length > 500) {
-        const overflow = tripDataRef.current.splice(
-          0,
-          tripDataRef.current.length - 500,
-        );
+      // === PERBAIKAN: BATCHING 200 DATA UNTUK MENGHILANGKAN LAG BIKIN HANG ===
+      if (tripDataRef.current.length >= 200) {
+        const chunkToSave = [...tripDataRef.current];
+        tripDataRef.current = [];
+
         AsyncStorage.getItem("@livina_trip_buffer").then((existing) => {
-          let buffer = existing ? JSON.parse(existing) : [];
-          buffer = buffer.concat(overflow);
+          let buffer = [];
+          try {
+            buffer = existing ? JSON.parse(existing) : [];
+          } catch (e) {}
+          buffer = buffer.concat(chunkToSave);
           AsyncStorage.setItem("@livina_trip_buffer", JSON.stringify(buffer));
         });
       }
 
       if (now - lastSaveTime.current > 30000) {
         lastSaveTime.current = now;
-        saveTripData(false).catch((e) => console.log("[AUTOSAVE] Gagal:", e));
+        saveTripData(false);
       }
     }
   };
@@ -461,16 +438,40 @@ export default function useDashboard() {
     }
   }, [obdStatus, isBypassed, isNightTime]);
 
+  // === PERBAIKAN: AUTO-SAVE & TUTUP MODAL SAAT DISCONNECT ===
   useEffect(() => {
     if (!isConnected) {
       setObdStatus("disconnected");
+
+      // Bersihkan layar dari semua popup
+      setIsHudMode(false);
+      setShowSettings(false);
+      setShowTransModal(false);
+      setShowOTAModal(false);
+      setShowTerminal(false);
+      setShowScanner(false);
+      setShowSaveTripModal(false);
+      deactivateKeepAwake("hud");
+
+      if (isRecordingRef.current) {
+        console.log("⚠️ BLE Putus! Memicu Auto-Save Trip...");
+        setIsRecording(false);
+        deactivateKeepAwake("recording");
+
+        const autoName = `Auto-Save (${new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })})`;
+        saveTripData(true, autoName).then(() => {
+          showAlert(
+            "Koneksi Terputus",
+            "Trip berhasil diamankan otomatis!",
+            "success",
+          );
+        });
+      }
     } else {
-      // PERBAIKAN: Masuk ke mode tahan/loading dulu untuk nanya ke ESP32!
       setObdStatus("checking");
     }
   }, [isConnected]);
 
-  // --- ACTIONS ---
   const handleConnectToModule = async () => {
     const hasPermission = await requestPermissions();
     if (hasPermission) {
@@ -492,12 +493,7 @@ export default function useDashboard() {
   };
 
   const handleHudTap = () => {
-    // 1. Bersihkan timer lama jika ada (mencegah bentrok)
-    if (hudTapTimer.current) {
-      clearTimeout(hudTapTimer.current);
-    }
-
-    // 2. Cek dan update jumlah tap
+    if (hudTapTimer.current) clearTimeout(hudTapTimer.current);
     setHudTapCount((prevCount) => {
       if (prevCount >= 1) {
         exitHudMode();
@@ -506,7 +502,6 @@ export default function useDashboard() {
         hudTapTimer.current = setTimeout(() => {
           setHudTapCount(0);
         }, 800);
-
         return 1;
       }
     });
@@ -550,7 +545,6 @@ export default function useDashboard() {
     RNStatusBar.setHidden(false, "slide");
     await deactivateKeepAwake("hud");
     setIsHudMode(false);
-
     if (hudTapTimer.current) {
       clearTimeout(hudTapTimer.current);
       setHudTapCount(0);
@@ -637,7 +631,6 @@ export default function useDashboard() {
       );
     await AsyncStorage.setItem("@ota_ssid", otaSsid);
     await AsyncStorage.setItem("@ota_pass", otaPass);
-
     setShowOTAModal(false);
 
     setTimeout(() => {
@@ -647,15 +640,13 @@ export default function useDashboard() {
         message: `Modul akan restart dan mencari Hotspot:\n"${otaSsid}"\n\nPastikan Hotspot HP Mas sudah aktif.`,
         confirmText: "Ya",
         cancelText: "Batal",
-        isDanger: true, // 👈 Kita set TRUE biar tombol konfirmasinya berwarna merah tegas, menandakan aksi restart!
+        isDanger: true,
         onConfirm: () => {
           sendMessage(`WIFI_SSID:${otaSsid}`);
           setTimeout(() => sendMessage(`WIFI_PASS:${otaPass}`), 300);
           setTimeout(() => {
             sendMessage("SET_MODE_0");
-
             setConfirmAlert((prev) => ({ ...prev, visible: false }));
-
             showAlert(
               "Mode OTA Aktif",
               `Nyalakan Hotspot "${otaSsid}" dan buka Aplikasi OTA.`,
@@ -674,23 +665,19 @@ export default function useDashboard() {
   if (isDFCO) currentFuelFlow = 0;
 
   let instFuel = 0.0;
-  if (isDFCO) {
-    instFuel = 99.9; // Tampilkan angka mentok kalau DFCO (Injektor mati)
-  } else if (data.s > 2 && currentFuelFlow > 0) {
-    instFuel = Math.min(data.s / currentFuelFlow, 99.9); // Cap maksimal di 99.9 km/L
-  } else {
-    instFuel = 0.0; // Saat idle (speed <= 2)
-  }
+  if (isDFCO) instFuel = 99.9;
+  else if (data.s > 2 && currentFuelFlow > 0)
+    instFuel = Math.min(data.s / currentFuelFlow, 99.9);
+  else instFuel = 0.0;
 
   const sendToTerminal = (cmd: string) => {
     if (!cmd.trim()) return;
     setTerminalLogs((prev) => [...prev, `$ ${cmd}`]);
-    sendMessage(`RAW:${cmd}`); // Tembak ke ESP32
+    sendMessage(`RAW:${cmd}`);
   };
 
   const closeTerminal = () => {
-    setShowTerminal(false); // Tutup layarnya
-    // Kembalikan teks ke kondisi awal (Reset)
+    setShowTerminal(false);
     setTerminalLogs([
       "LivinaProDash OBD Terminal v1.0",
       "Ketik PID lalu tekan Enter/Kirim...",
@@ -698,7 +685,6 @@ export default function useDashboard() {
     ]);
   };
 
-  // --- KEMBALIKAN SEMUA STATE & ACTIONS KE INDEX.TSX ---
   return {
     state: {
       isHudMode,
