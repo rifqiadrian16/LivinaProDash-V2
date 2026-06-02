@@ -179,7 +179,7 @@ var map = L.map('map', {
   fadeAnimation: false,
   zoomAnimation: false,
   markerZoomAnimation: false,
-  zoomSnap: 0.1
+  // zoomSnap: 0.1
 });
 if (${isSolid}) {
     L.tileLayer('${tileUrl}', { maxZoom: 19, detectRetina: true }).addTo(map);

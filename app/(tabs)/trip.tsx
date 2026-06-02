@@ -138,6 +138,136 @@ export default function TripScreen() {
     }
   };
 
+  const recoverOrphanTrip = async () => {
+    try {
+      // Karena buffer terlalu besar untuk dibaca,
+      // kita buat trip stub dari stats checkpoint saja
+      const statsRaw = await AsyncStorage.getItem("@livina_running_stats");
+      const tripsBak = await AsyncStorage.getItem("@livina_trips_bak");
+
+      // KASUS 1: Coba pulihkan dari trips_bak dulu (paling aman)
+      if (tripsBak) {
+        try {
+          const bak = JSON.parse(tripsBak);
+          if (Array.isArray(bak) && bak.length > 0) {
+            await AsyncStorage.setItem("@livina_trips", tripsBak);
+            // Bersihkan buffer yang oversized
+            await AsyncStorage.multiRemove([
+              "@livina_trip_buffer",
+              "@livina_trip_buffer_bak",
+              "@livina_running_stats",
+            ]);
+            showAlert(
+              "SUKSES",
+              `${bak.length} trip dipulihkan dari backup!`,
+              "success",
+            );
+            syncTrips();
+            return;
+          }
+        } catch (e) {}
+      }
+
+      // KASUS 2: Tidak ada backup trip, tapi ada stats checkpoint
+      // Buat trip stub tanpa routeData (peta kosong, stats ada)
+      if (statsRaw) {
+        try {
+          const stats = JSON.parse(statsRaw);
+          if (stats.tripId && stats.distance > 0) {
+            const stubTrip = {
+              id: stats.tripId,
+              date: new Date().toLocaleDateString("id-ID", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              }),
+              route: `Trip Dipulihkan (peta tidak tersedia)`,
+              distance: stats.distance.toFixed(1) + " km",
+              time: Math.round((Date.now() - stats.startTime) / 60000) + "m",
+              fuel: stats.fuel > 0 ? stats.fuel.toFixed(1) + " L" : "~",
+              ecoScore: 80,
+              details: {
+                topSpeed: "~",
+                maxRpm: 0,
+                fuelUsed: stats.fuel > 0 ? stats.fuel.toFixed(1) + " L" : "~",
+                cost:
+                  stats.fuel > 0
+                    ? "Rp " +
+                      Math.round(stats.fuel * 10000).toLocaleString("id-ID")
+                    : "~",
+                peakAlt: "~",
+                climb: "~",
+              },
+              routeData: [], // kosong karena buffer tidak bisa dibaca
+            };
+
+            const existingRaw = await AsyncStorage.getItem("@livina_trips");
+            let existing: any[] = [];
+            try {
+              if (existingRaw) existing = JSON.parse(existingRaw);
+            } catch (e) {}
+            if (!Array.isArray(existing)) existing = [];
+
+            existing.unshift(stubTrip);
+            await AsyncStorage.setItem(
+              "@livina_trips",
+              JSON.stringify(existing),
+            );
+            await AsyncStorage.multiRemove([
+              "@livina_trip_buffer",
+              "@livina_trip_buffer_bak",
+              "@livina_running_stats",
+            ]);
+
+            showAlert(
+              "DIPULIHKAN SEBAGIAN",
+              `Jarak ${stubTrip.distance} diselamatkan. Data peta tidak bisa dibaca karena terlalu besar.`,
+              "success",
+            );
+            syncTrips();
+            return;
+          }
+        } catch (e) {}
+      }
+
+      // KASUS 3: Tidak ada apapun — hapus buffer oversized supaya app tidak crash terus
+      await AsyncStorage.multiRemove([
+        "@livina_trip_buffer",
+        "@livina_trip_buffer_bak",
+        "@livina_running_stats",
+      ]);
+      showAlert(
+        "TIDAK ADA DATA",
+        "Buffer terlalu besar dan tidak ada backup. Storage dibersihkan.",
+        "error",
+      );
+    } catch (e) {
+      // Kalau bahkan getItem statsRaw pun error, paksa bersihkan semua
+      await AsyncStorage.multiRemove([
+        "@livina_trip_buffer",
+        "@livina_trip_buffer_bak",
+        "@livina_running_stats",
+      ]);
+      showAlert(
+        "DIBERSIHKAN",
+        "Storage error dibersihkan. Silakan coba trip berikutnya.",
+        "error",
+      );
+    }
+  };
+
+  const nukeStorage = async () => {
+    await AsyncStorage.multiRemove([
+      "@livina_trips",
+      "@livina_trips_bak",
+      "@livina_trip_buffer",
+      "@livina_trip_buffer_bak",
+      "@livina_running_stats",
+    ]);
+    setTripHistory([]);
+    showAlert("BERSIH", "Semua storage trup dibersihkan", "success");
+  };
+
   const injectDummyData = async () => {
     const dummyTrips = [
       // ---------------------------------------------------------
@@ -493,6 +623,28 @@ export default function TripScreen() {
           >
             <Text style={{ color: "#fff", fontSize: 10 }}>Inject Dummy</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={recoverOrphanTrip}
+            style={{
+              marginLeft: 8,
+              backgroundColor: "#c0392b",
+              padding: 5,
+              borderRadius: 5,
+            }}
+          >
+            <Text style={{ color: "#fff", fontSize: 10 }}>🚨 Recover</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={nukeStorage}
+            style={{
+              marginLeft: 8,
+              backgroundColor: "#555",
+              padding: 5,
+              borderRadius: 5,
+            }}
+          >
+            <Text style={{ color: "#fff", fontSize: 10 }}>Nuke</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={{ flexDirection: "row", gap: 12 }}>
@@ -502,9 +654,9 @@ export default function TripScreen() {
             disabled={isSyncing}
           >
             {isSyncing ? (
-              <ActivityIndicator size="small" color="#00ffcc" />
+              <ActivityIndicator size="small" color="#00ff88" />
             ) : (
-              <Ionicons name="sync-circle-outline" size={24} color="#00ffcc" />
+              <Ionicons name="sync-circle-outline" size={24} color="#00ff88" />
             )}
           </TouchableOpacity>
         </View>
@@ -583,7 +735,7 @@ export default function TripScreen() {
               </View>
 
               <View style={styles.routeContainer}>
-                <Ionicons name="map-outline" size={24} color="#00ffcc" />
+                <Ionicons name="map-outline" size={24} color="#00ff88" />
                 <Text style={styles.routeText}>{trip.route}</Text>
               </View>
 
@@ -660,7 +812,7 @@ export default function TripScreen() {
                     <Ionicons
                       name="download-outline"
                       size={24}
-                      color="#00ffcc"
+                      color="#00ff88"
                     />
                   </TouchableOpacity>
 
@@ -691,7 +843,7 @@ export default function TripScreen() {
                       paddingVertical: 6,
                       borderRadius: 20,
                       backgroundColor:
-                        playbackMapType === type ? "#00ffcc" : "#333",
+                        playbackMapType === type ? "#00ff88" : "#333",
                     }}
                   >
                     <Text
@@ -771,7 +923,7 @@ export default function TripScreen() {
                       setIsPlaying(false);
                       setPlaybackIndex(val);
                     }}
-                    minimumTrackTintColor="#00ffcc"
+                    minimumTrackTintColor="#00ff88"
                     maximumTrackTintColor="#333"
                     thumbTintColor="#fff"
                   />
@@ -788,7 +940,7 @@ export default function TripScreen() {
               {/* PANEL TELEMETRI REAL-TIME (8 SENSOR) */}
               <View style={styles.inspectorCard}>
                 <View style={styles.inspectorHeader}>
-                  <Ionicons name="analytics" size={20} color="#00ffcc" />
+                  <Ionicons name="analytics" size={20} color="#00ff88" />
                   <Text style={styles.inspectorTitle}>LIVE TELEMETRY</Text>
                   <Text style={styles.inspectorNote}>
                     {selectedTrip.routeData[playbackIndex]?.note || ""}
@@ -800,7 +952,7 @@ export default function TripScreen() {
                   {/* BARIS 1: Sensor Dasar */}
                   <View style={styles.inspectorBox}>
                     <Text style={styles.inspectorLabel}>SPEED</Text>
-                    <Text style={[styles.inspectorValue, { color: "#00ffcc" }]}>
+                    <Text style={[styles.inspectorValue, { color: "#00ff88" }]}>
                       {selectedTrip.routeData[playbackIndex]?.speed || 0}{" "}
                       <Text style={styles.inspectorUnit}>km/h</Text>
                     </Text>

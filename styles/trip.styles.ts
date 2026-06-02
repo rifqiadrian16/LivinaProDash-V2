@@ -111,7 +111,7 @@ export const tripStyles = StyleSheet.create({
   modalTitle: { fontSize: 24, fontWeight: "900", color: "#fff" },
   modalSubtitle: {
     fontSize: 14,
-    color: "#00ffcc",
+    color: "#00ff88",
     marginTop: 4,
     fontWeight: "bold",
   },
@@ -140,7 +140,7 @@ export const tripStyles = StyleSheet.create({
     width: 45,
     height: 45,
     borderRadius: 25,
-    backgroundColor: "#00ffcc",
+    backgroundColor: "#00ff88",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -222,7 +222,7 @@ export const tripStyles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 8,
   },
-  themeBtnActive: { backgroundColor: "#00ffcc" },
+  themeBtnActive: { backgroundColor: "#00ff88" },
   themeBtnText: { color: "#888", fontWeight: "bold", fontSize: 12 },
   captureArea: {
     width: 310, // Wajib sama persis dengan .card HTML (310px)
@@ -252,7 +252,7 @@ export const tripStyles = StyleSheet.create({
   shareCancelText: { color: "#fff", fontWeight: "bold" },
   shareSubmitBtn: {
     flex: 2,
-    backgroundColor: "#00ffcc",
+    backgroundColor: "#00ff88",
     flexDirection: "row",
     paddingVertical: 14,
     borderRadius: 10,
@@ -298,7 +298,7 @@ export const tripStyles = StyleSheet.create({
     marginTop: -5,
   },
   timeText: { color: "#666", fontSize: 10, fontWeight: "bold" },
-  timeTextCurrent: { color: "#00ffcc", fontSize: 12, fontWeight: "bold" },
+  timeTextCurrent: { color: "#00ff88", fontSize: 12, fontWeight: "bold" },
   inspectorCard: {
     backgroundColor: "#1a1a1a",
     padding: 15,

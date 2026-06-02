@@ -4,7 +4,12 @@ import * as ExpoLocation from "expo-location";
 import * as NavigationBar from "expo-navigation-bar";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { useEffect, useRef, useState } from "react";
-import { Animated, PanResponder, StatusBar as RNStatusBar } from "react-native";
+import {
+  Animated,
+  AppState,
+  PanResponder,
+  StatusBar as RNStatusBar,
+} from "react-native";
 import { useAlert } from "../components/AlertContext";
 import useBLE from "./useBLE";
 
@@ -46,13 +51,17 @@ export default function useDashboard() {
   const tripDataRef = useRef<any[]>([]);
   const lastUpdateTime = useRef(Date.now());
   const lastSaveTime = useRef(0);
+  const lastStatsSaveTime = useRef(0);
   const currentTripId = useRef("");
   const latestLocation = useRef<ExpoLocation.LocationObjectCoords | null>(null);
   const runningStats = useRef({ distance: 0, fuel: 0, startTime: 0 });
   const isRecordingRef = useRef(isRecording);
 
+  // === MUTEX LOCK ===
+  // Mencegah tabrakan tulis (Race Condition) jika auto-save & disconnect berjalan bersamaan
+  const isSavingRef = useRef(false);
+
   const [showSaveTripModal, setShowSaveTripModal] = useState(false);
-  const pendingTripName = useRef("");
 
   const [showSettings, setShowSettings] = useState(false);
   const [obdType, setObdType] = useState<"bluetooth" | "wifi">("bluetooth");
@@ -129,6 +138,43 @@ export default function useDashboard() {
       const savedPin = await AsyncStorage.getItem("@obd_pin");
       const savedOtaSsid = await AsyncStorage.getItem("@ota_ssid");
       const savedOtaPass = await AsyncStorage.getItem("@ota_pass");
+      const orphanBuffer = await AsyncStorage.getItem("@livina_trip_buffer");
+      const orphanStats = await AsyncStorage.getItem("@livina_running_stats");
+
+      if (orphanBuffer && orphanStats) {
+        try {
+          const stats = JSON.parse(orphanStats);
+          const buffer = JSON.parse(orphanBuffer);
+
+          if (Array.isArray(buffer) && buffer.length > 5 && stats.tripId) {
+            // Ada trip terbengkalai — restore state-nya
+            currentTripId.current = stats.tripId;
+            runningStats.current = {
+              distance: stats.distance || 0,
+              fuel: stats.fuel || 0,
+              startTime: stats.startTime || Date.now(),
+            };
+
+            // Auto-finalize sebagai auto-save
+            const autoName = `Auto-Save (Recovery ${new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })})`;
+            await saveTripData(true, autoName);
+
+            // Bersihkan stats checkpoint
+            await AsyncStorage.removeItem("@livina_running_stats");
+
+            showAlert(
+              "Trip Dipulihkan",
+              "Data perjalanan sebelumnya berhasil diselamatkan!",
+              "success",
+            );
+          }
+        } catch (e) {
+          // Buffer atau stats corrupt, bersihkan saja
+          await AsyncStorage.removeItem("@livina_trip_buffer");
+          await AsyncStorage.removeItem("@livina_trip_buffer_bak");
+          await AsyncStorage.removeItem("@livina_running_stats");
+        }
+      }
 
       if (savedMac) setObdMac(savedMac);
       if (savedPin) setObdPin(savedPin);
@@ -164,29 +210,94 @@ export default function useDashboard() {
     isRecordingRef.current = isRecording;
   }, [isRecording]);
 
-  // === PERBAIKAN: ANTI CORRUPT & ERROR HANDLING JSON ===
-  const saveTripData = async (isFinal = false, tripName?: string) => {
+  const flushBuffer = async () => {
+    if (tripDataRef.current.length === 0) return;
+    const chunk = [...tripDataRef.current];
+    tripDataRef.current = [];
+
     try {
-      const bufferRaw = await AsyncStorage.getItem("@livina_trip_buffer");
+      let bufferRaw = await AsyncStorage.getItem("@livina_trip_buffer");
       let buffer: any[] = [];
-      if (bufferRaw) {
-        try {
-          buffer = JSON.parse(bufferRaw);
-        } catch (e) {
-          await AsyncStorage.removeItem("@livina_trip_buffer");
+      try {
+        if (bufferRaw) {
+          const parsed = JSON.parse(bufferRaw);
+          // Defensive Check: Pastikan hasil parse adalah Array
+          buffer = Array.isArray(parsed) ? parsed : [];
+        }
+      } catch (e) {
+        const bak = await AsyncStorage.getItem("@livina_trip_buffer_bak");
+        if (bak) {
+          const parsedBak = JSON.parse(bak);
+          buffer = Array.isArray(parsedBak) ? parsedBak : [];
         }
       }
 
-      const allData: any[] = buffer.concat(tripDataRef.current);
-      if (allData.length < 5) return; // Mencegah nyimpan trip kosong
+      buffer = buffer.concat(chunk);
+      const str = JSON.stringify(buffer);
 
-      const existing = await AsyncStorage.getItem("@livina_trips");
-      let parsed = [];
-      if (existing) {
-        try {
-          parsed = JSON.parse(existing);
-        } catch (e) {
-          await AsyncStorage.removeItem("@livina_trips");
+      await AsyncStorage.setItem("@livina_trip_buffer_bak", str);
+      await AsyncStorage.setItem("@livina_trip_buffer", str);
+    } catch (e) {
+      tripDataRef.current = [...chunk, ...tripDataRef.current];
+    }
+  };
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "background" || state === "inactive") {
+        if (isRecordingRef.current) {
+          console.log(
+            "Aplikasi ke background! Flushing sisa RAM ke Local Storage...",
+          );
+          flushBuffer();
+        }
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  const saveTripData = async (isFinal = false, tripName?: string) => {
+    // === IMPLEMENTASI MUTEX ===
+    if (isSavingRef.current) {
+      console.log(
+        "⏳ Data sedang disimpan proses lain, skip untuk mencegah bentrok/corrupt.",
+      );
+      return;
+    }
+    isSavingRef.current = true; // Kunci gembok
+
+    try {
+      await flushBuffer();
+
+      let bufferRaw = await AsyncStorage.getItem("@livina_trip_buffer");
+      let allData: any[] = [];
+      try {
+        if (bufferRaw) {
+          const parsed = JSON.parse(bufferRaw);
+          allData = Array.isArray(parsed) ? parsed : [];
+        }
+      } catch (e) {
+        const bak = await AsyncStorage.getItem("@livina_trip_buffer_bak");
+        if (bak) {
+          const parsedBak = JSON.parse(bak);
+          allData = Array.isArray(parsedBak) ? parsedBak : [];
+        }
+      }
+
+      if (allData.length < 5) return;
+
+      let existingRaw = await AsyncStorage.getItem("@livina_trips");
+      let parsedTrips: any[] = [];
+      try {
+        if (existingRaw) {
+          const pt = JSON.parse(existingRaw);
+          parsedTrips = Array.isArray(pt) ? pt : [];
+        }
+      } catch (e) {
+        const bakTrips = await AsyncStorage.getItem("@livina_trips_bak");
+        if (bakTrips) {
+          const ptBak = JSON.parse(bakTrips);
+          parsedTrips = Array.isArray(ptBak) ? ptBak : [];
         }
       }
 
@@ -234,16 +345,25 @@ export default function useDashboard() {
         routeData: allData,
       };
 
-      const idx = parsed.findIndex((t: any) => t.id === currentTripId.current);
-      if (idx !== -1) parsed[idx] = newTrip;
-      else parsed.unshift(newTrip);
+      const idx = parsedTrips.findIndex(
+        (t: any) => t.id === currentTripId.current,
+      );
+      if (idx !== -1) parsedTrips[idx] = newTrip;
+      else parsedTrips.unshift(newTrip);
 
-      await AsyncStorage.setItem("@livina_trips", JSON.stringify(parsed));
-      if (isFinal) await AsyncStorage.removeItem("@livina_trip_buffer");
-      if (isFinal)
-        showAlert("Trip Saved", "Riwayat perjalanan aman.", "success");
+      const strTrips = JSON.stringify(parsedTrips);
+      await AsyncStorage.setItem("@livina_trips_bak", strTrips);
+      await AsyncStorage.setItem("@livina_trips", strTrips);
+
+      if (isFinal) {
+        await AsyncStorage.removeItem("@livina_trip_buffer");
+        await AsyncStorage.removeItem("@livina_trip_buffer_bak");
+        showAlert("Trip Tersimpan", "Riwayat perjalanan diamankan.", "success");
+      }
     } catch (e) {
       console.log("[SAVE TRIP ERROR]", e);
+    } finally {
+      isSavingRef.current = false; // Buka gembok kembali
     }
   };
 
@@ -254,7 +374,12 @@ export default function useDashboard() {
       currentTripId.current = Date.now().toString();
       lastUpdateTime.current = Date.now();
       lastSaveTime.current = Date.now();
-      AsyncStorage.removeItem("@livina_trip_buffer").then(() => {
+      isSavingRef.current = false;
+      AsyncStorage.multiRemove([
+        "@livina_trip_buffer",
+        "@livina_trip_buffer_bak",
+        "@livina_running_stats",
+      ]).then(() => {
         setIsRecording(true);
         activateKeepAwakeAsync("recording");
         showAlert("Recording", "GPS & Telemetri aktif.", "success");
@@ -268,13 +393,18 @@ export default function useDashboard() {
 
   const confirmSaveTrip = (tripName: string) => {
     setShowSaveTripModal(false);
+    AsyncStorage.removeItem("@livina_running_stats");
     saveTripData(true, tripName);
   };
 
   const discardTrip = () => {
     setShowSaveTripModal(false);
     tripDataRef.current = [];
-    AsyncStorage.removeItem("@livina_trip_buffer");
+    AsyncStorage.multiRemove([
+      "@livina_trip_buffer",
+      "@livina_trip_buffer_bak",
+      "@livina_running_stats", // ← tambah ini
+    ]);
     showAlert("Dibatalkan", "Trip tidak disimpan.", "error");
   };
 
@@ -320,8 +450,14 @@ export default function useDashboard() {
     const dt = (now - lastUpdateTime.current) / 3600000;
     lastUpdateTime.current = now;
 
-    let fuelFlow = newData.m * 0.3309;
-    fuelFlow = fuelFlow * (1 + (newData.st + newData.lt) / 100);
+    let targetAFR = 14.7;
+    if (newData.th > 50) targetAFR = 12.0;
+    else if (newData.th > 30) targetAFR = 13.5;
+
+    let fuelFlow = (newData.m / targetAFR / 740.0) * 3600.0;
+    const fuelCalibration = 1.15;
+    fuelFlow =
+      fuelFlow * (1 + (newData.st + newData.lt) / 100) * fuelCalibration;
 
     const isDFCO = newData.th === 0 && newData.s > 20 && newData.r > 1200;
     if (isDFCO) fuelFlow = 0;
@@ -337,6 +473,17 @@ export default function useDashboard() {
       if (dt > 0 && dt < 0.003) {
         runningStats.current.distance += newData.s * dt;
         runningStats.current.fuel += fuelFlow * dt;
+
+        if (now - lastStatsSaveTime.current > 10000) {
+          lastStatsSaveTime.current = now;
+          AsyncStorage.setItem(
+            "@livina_running_stats",
+            JSON.stringify({
+              ...runningStats.current,
+              tripId: currentTripId.current,
+            }),
+          ).catch(() => {});
+        }
       }
 
       let recInst = 0.0;
@@ -372,19 +519,8 @@ export default function useDashboard() {
               : "Cruising",
       });
 
-      // === PERBAIKAN: BATCHING 200 DATA UNTUK MENGHILANGKAN LAG BIKIN HANG ===
-      if (tripDataRef.current.length >= 200) {
-        const chunkToSave = [...tripDataRef.current];
-        tripDataRef.current = [];
-
-        AsyncStorage.getItem("@livina_trip_buffer").then((existing) => {
-          let buffer = [];
-          try {
-            buffer = existing ? JSON.parse(existing) : [];
-          } catch (e) {}
-          buffer = buffer.concat(chunkToSave);
-          AsyncStorage.setItem("@livina_trip_buffer", JSON.stringify(buffer));
-        });
+      if (tripDataRef.current.length >= 100) {
+        flushBuffer();
       }
 
       if (now - lastSaveTime.current > 30000) {
@@ -438,12 +574,9 @@ export default function useDashboard() {
     }
   }, [obdStatus, isBypassed, isNightTime]);
 
-  // === PERBAIKAN: AUTO-SAVE & TUTUP MODAL SAAT DISCONNECT ===
   useEffect(() => {
     if (!isConnected) {
       setObdStatus("disconnected");
-
-      // Bersihkan layar dari semua popup
       setIsHudMode(false);
       setShowSettings(false);
       setShowTransModal(false);
@@ -455,17 +588,23 @@ export default function useDashboard() {
 
       if (isRecordingRef.current) {
         console.log("⚠️ BLE Putus! Memicu Auto-Save Trip...");
+
+        // FIX RACE CONDITION: Pastikan state Ref dimatikan duluan sebelum simpan
         setIsRecording(false);
+        isRecordingRef.current = false;
         deactivateKeepAwake("recording");
 
-        const autoName = `Auto-Save (${new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })})`;
-        saveTripData(true, autoName).then(() => {
-          showAlert(
-            "Koneksi Terputus",
-            "Trip berhasil diamankan otomatis!",
-            "success",
-          );
-        });
+        // Beri jeda 300ms agar jika ada proses flush/batching yang sedang berjalan bisa selesai dulu
+        setTimeout(() => {
+          const autoName = `Auto-Save (${new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })})`;
+          saveTripData(true, autoName).then(() => {
+            showAlert(
+              "Koneksi Terputus",
+              "Sistem mematikan perekaman dan mengamankan data otomatis.",
+              "success",
+            );
+          });
+        }, 300);
       }
     } else {
       setObdStatus("checking");
@@ -658,8 +797,14 @@ export default function useDashboard() {
     }, 300);
   };
 
-  let currentFuelFlow = data.m * 0.3309;
-  currentFuelFlow = currentFuelFlow * (1 + (data.st + data.lt) / 100);
+  let targetAFR = 14.7;
+  if (data.th > 50) targetAFR = 12.0;
+  else if (data.th > 30) targetAFR = 13.5;
+
+  let currentFuelFlow = (data.m / targetAFR / 740.0) * 3600.0;
+  const fuelCalibration = 1.15;
+  currentFuelFlow =
+    currentFuelFlow * (1 + (data.st + data.lt) / 100) * fuelCalibration;
 
   const isDFCO = data.th === 0 && data.s > 20 && data.r > 1200;
   if (isDFCO) currentFuelFlow = 0;
