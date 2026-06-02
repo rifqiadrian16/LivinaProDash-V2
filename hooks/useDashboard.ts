@@ -1,11 +1,17 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import * as ExpoLocation from "expo-location";
+import * as MediaLibrary from "expo-media-library";
 import * as NavigationBar from "expo-navigation-bar";
 import * as ScreenOrientation from "expo-screen-orientation";
-import * as TaskManager from "expo-task-manager";
 import { useEffect, useRef, useState } from "react";
-import { Animated, PanResponder, StatusBar as RNStatusBar } from "react-native";
+import {
+  Animated,
+  PanResponder,
+  PermissionsAndroid,
+  Platform,
+  StatusBar as RNStatusBar,
+} from "react-native";
 import { useAlert } from "../components/AlertContext";
 import {
   getDB,
@@ -16,15 +22,6 @@ import {
 import useBLE from "./useBLE";
 
 const BACKGROUND_LOCATION_TASK = "LIVINA_BACKGROUND_TRACKING";
-
-TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
-  if (error) {
-    console.error("Background Task Error:", error);
-    return;
-  }
-  if (data) {
-  }
-});
 
 export default function useDashboard() {
   const { showAlert } = useAlert();
@@ -142,14 +139,45 @@ export default function useDashboard() {
   const [bgPermissionsGranted, setBgPermissionsGranted] = useState(false);
 
   useEffect(() => {
-    // Minta izin ke user saat aplikasi pertama buka
-    (async () => {
-      const fg = await ExpoLocation.requestForegroundPermissionsAsync();
-      if (fg.granted) {
-        const bg = await ExpoLocation.requestBackgroundPermissionsAsync();
-        setBgPermissionsGranted(bg.granted);
+    const requestAllPermissions = async () => {
+      if (Platform.OS !== "android") return;
+
+      // 1. TODONG IZIN NOTIFIKASI (Khusus Android 13+)
+      if (Platform.Version >= 33) {
+        try {
+          await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+          );
+        } catch (err) {
+          console.warn("[PERMISSIONS] Gagal minta izin notifikasi:", err);
+        }
       }
-    })();
+
+      // 2. TODONG IZIN FOTO / GALERI (Untuk menyimpan Kartu Trip)
+      try {
+        const mediaStatus = await MediaLibrary.requestPermissionsAsync();
+        if (!mediaStatus.granted) {
+          console.log("[PERMISSIONS] User menolak izin Foto/Galeri");
+        }
+      } catch (err) {
+        console.warn("[PERMISSIONS] Gagal minta izin galeri:", err);
+      }
+
+      // 3. TODONG IZIN LOKASI (Foreground dulu, baru Background)
+      try {
+        const fgStatus = await ExpoLocation.requestForegroundPermissionsAsync();
+        if (fgStatus.granted) {
+          const bgStatus =
+            await ExpoLocation.requestBackgroundPermissionsAsync();
+          setBgPermissionsGranted(bgStatus.granted);
+        }
+      } catch (err) {
+        console.warn("[PERMISSIONS] Gagal minta izin lokasi:", err);
+      }
+    };
+
+    // Eksekusi fungsi sapu jagatnya!
+    requestAllPermissions();
   }, []);
 
   useEffect(() => {
@@ -562,6 +590,24 @@ export default function useDashboard() {
       setObdStatus("checking");
     }
   }, [isConnected]);
+
+  useEffect(() => {
+    if (isBypassed) return;
+    if (!isConnected && isRecording) {
+      console.warn(
+        "Bluetooth putus di tengah jalan! Menghentikan perekaman...",
+      );
+      // Panggil fungsi toggleRecord untuk mematikan mode record
+      toggleRecording();
+
+      // Beri tahu user
+      showAlert(
+        "Koneksi Terputus",
+        "Perekaman Trip dihentikan otomatis karena modul OBD/ESP32 terputus.",
+        "error",
+      );
+    }
+  }, [isConnected, isRecording, isBypassed]);
 
   const handleConnectToModule = async () => {
     const hasPermission = await requestPermissions();

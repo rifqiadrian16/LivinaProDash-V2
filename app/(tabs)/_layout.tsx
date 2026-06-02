@@ -1,11 +1,23 @@
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Tabs } from "expo-router";
+import * as TaskManager from "expo-task-manager";
 import React, { useEffect } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { AlertProvider } from "../../components/AlertContext";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { initDB } from "../../utils/database";
+
+const BACKGROUND_LOCATION_TASK = "LIVINA_BACKGROUND_TRACKING";
+
+TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
+  if (error) {
+    console.error("Background Task Error:", error);
+    return;
+  }
+  if (data) {
+  }
+});
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();

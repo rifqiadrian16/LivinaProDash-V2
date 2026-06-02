@@ -120,6 +120,10 @@ export default function useBLE(
           setIsConnected(false);
           setConnectedDevice(null);
           isConnectingRef.current = false;
+
+          // 👇 SUNTIKAN ANTI MACET 👇
+          messageQueue.current = [];
+          isProcessingQueue.current = false;
         },
       );
 
@@ -179,7 +183,11 @@ export default function useBLE(
     setIsConnected(false);
     setConnectedDevice(null);
     isConnectingRef.current = false;
-    console.log("[BLE] Disconnect manual berhasil.");
+
+    // 👇 SUNTIKAN ANTI MACET 👇
+    messageQueue.current = [];
+    isProcessingQueue.current = false;
+    console.log("[BLE] Disconnect manual berhasil & Queue direset.");
   };
 
   // Request permission Bluetooth & Location
