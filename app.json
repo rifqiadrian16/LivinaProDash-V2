@@ -48,16 +48,19 @@
       "favicon": "./assets/images/livina.png"
     },
     "plugins": [
-      "expo-location",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "LivinaProDash butuh akses lokasi untuk merekam rute di latar belakang.",
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
       "expo-router",
       [
         "@config-plugins/react-native-ble-plx",
         {
           "isBackgroundEnabled": true,
-          "modes": [
-            "peripheral",
-            "central"
-          ],
+          "modes": ["peripheral", "central"],
           "bluetoothAlwaysPermission": "Livina ProDash butuh akses Bluetooth untuk terhubung dan membaca data dari Modul ECU/OBD2 Mobil Anda."
         }
       ],
@@ -87,7 +90,8 @@
           }
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,

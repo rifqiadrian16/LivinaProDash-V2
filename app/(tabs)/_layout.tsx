@@ -1,15 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Tabs } from "expo-router";
-import React from "react";
+import React, { useEffect } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { AlertProvider } from "../../components/AlertContext";
-
 import { useColorScheme } from "../../hooks/use-color-scheme";
+import { initDB } from "../../utils/database";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
+
+  useEffect(() => {
+    initDB();
+  }, []);
 
   return (
     <AlertProvider>

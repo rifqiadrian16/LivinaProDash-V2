@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { memo, useEffect, useRef, useState } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 import Svg, {
   Circle,
@@ -16,172 +16,170 @@ interface MainGaugesProps {
   transmission?: string;
 }
 
-export default function MainGauges({
-  speed = 0,
-  rpm = 0,
-  transmission = "matic",
-}: MainGaugesProps) {
-  const MAX_RPM = 8000;
-  const REDLINE_RPM = 6500;
+// 1. Bungkus dengan memo()
+const MainGauges = memo(
+  ({ speed = 0, rpm = 0, transmission = "matic" }: MainGaugesProps) => {
+    const MAX_RPM = 8000;
+    const REDLINE_RPM = 6500;
 
-  // === PERBAIKAN: STATE ANIMASI SMOOTH ===
-  const [animRpm, setAnimRpm] = useState(rpm);
-  const [animSpeed, setAnimSpeed] = useState(speed);
-  const rpmValue = useRef(new Animated.Value(rpm)).current;
-  const speedValue = useRef(new Animated.Value(speed)).current;
+    const [animRpm, setAnimRpm] = useState(rpm);
+    const [animSpeed, setAnimSpeed] = useState(speed);
+    const rpmValue = useRef(new Animated.Value(rpm)).current;
+    const speedValue = useRef(new Animated.Value(speed)).current;
 
-  // Trigger animasi saat prop berubah
-  useEffect(() => {
-    Animated.timing(rpmValue, {
-      toValue: rpm,
-      duration: 250,
-      useNativeDriver: false,
-    }).start();
-    Animated.timing(speedValue, {
-      toValue: speed,
-      duration: 250,
-      useNativeDriver: false,
-    }).start();
-  }, [rpm, speed]);
+    useEffect(() => {
+      Animated.timing(rpmValue, {
+        toValue: rpm,
+        duration: 250,
+        useNativeDriver: false,
+      }).start();
+      Animated.timing(speedValue, {
+        toValue: speed,
+        duration: 250,
+        useNativeDriver: false,
+      }).start();
+    }, [rpm, speed]);
 
-  // Pantau nilai animasi untuk di-render ke SVG
-  useEffect(() => {
-    const rSub = rpmValue.addListener((v) => setAnimRpm(v.value));
-    const sSub = speedValue.addListener((v) => setAnimSpeed(v.value));
-    return () => {
-      rpmValue.removeListener(rSub);
-      speedValue.removeListener(sSub);
+    useEffect(() => {
+      const rSub = rpmValue.addListener((v) => setAnimRpm(v.value));
+      const sSub = speedValue.addListener((v) => setAnimSpeed(v.value));
+      return () => {
+        rpmValue.removeListener(rSub);
+        speedValue.removeListener(sSub);
+      };
+    }, []);
+
+    const isRedline = animRpm >= REDLINE_RPM;
+    const safeRpm = Math.min(Math.max(animRpm, 0), MAX_RPM);
+    const cx = 160;
+    const cy = 160;
+    const radius = 145;
+    const strokeWidth = 3;
+    const startAngle = -90;
+    const sweepAngle = 180;
+    const endAngle = startAngle + (safeRpm / MAX_RPM) * sweepAngle;
+    const redlineStartAngle = startAngle + (REDLINE_RPM / MAX_RPM) * sweepAngle;
+
+    const polarToCartesian = (
+      centerX: number,
+      centerY: number,
+      r: number,
+      angleInDegrees: number,
+    ) => {
+      const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180.0;
+      return {
+        x: centerX + r * Math.cos(angleInRadians),
+        y: centerY + r * Math.sin(angleInRadians),
+      };
     };
-  }, []);
 
-  const isRedline = animRpm >= REDLINE_RPM;
-  const safeRpm = Math.min(Math.max(animRpm, 0), MAX_RPM);
-
-  const cx = 160;
-  const cy = 160;
-  const radius = 145;
-  const strokeWidth = 3;
-  const startAngle = -90;
-  const sweepAngle = 180;
-  const endAngle = startAngle + (safeRpm / MAX_RPM) * sweepAngle;
-  const redlineStartAngle = startAngle + (REDLINE_RPM / MAX_RPM) * sweepAngle;
-
-  const polarToCartesian = (
-    centerX: number,
-    centerY: number,
-    r: number,
-    angleInDegrees: number,
-  ) => {
-    const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180.0;
-    return {
-      x: centerX + r * Math.cos(angleInRadians),
-      y: centerY + r * Math.sin(angleInRadians),
+    const dArc = (start: number, end: number, r: number) => {
+      const startPoint = polarToCartesian(cx, cy, r, start);
+      const endPoint = polarToCartesian(cx, cy, r, end);
+      return `M ${startPoint.x} ${startPoint.y} A ${r} ${r} 0 0 1 ${endPoint.x} ${endPoint.y}`;
     };
-  };
 
-  const dArc = (start: number, end: number, r: number) => {
-    const startPoint = polarToCartesian(cx, cy, r, start);
-    const endPoint = polarToCartesian(cx, cy, r, end);
-    return `M ${startPoint.x} ${startPoint.y} A ${r} ${r} 0 0 1 ${endPoint.x} ${endPoint.y}`;
-  };
+    const backgroundTrack = dArc(startAngle, startAngle + sweepAngle, radius);
+    const redlineTrack = dArc(
+      redlineStartAngle,
+      startAngle + sweepAngle,
+      radius,
+    );
+    const activeTrack = safeRpm > 0 ? dArc(startAngle, endAngle, radius) : "";
 
-  const backgroundTrack = dArc(startAngle, startAngle + sweepAngle, radius);
-  const redlineTrack = dArc(redlineStartAngle, startAngle + sweepAngle, radius);
-  const activeTrack = safeRpm > 0 ? dArc(startAngle, endAngle, radius) : "";
-  const estimatedGear = useGearRatio(animRpm, animSpeed, transmission); // Gear ngikutin RPM yang dianimasikan
+    const estimatedGear = useGearRatio(animRpm, animSpeed, transmission);
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.gearContainer}>
-        <Text style={styles.gearText}>{estimatedGear}</Text>
-      </View>
-      <View style={styles.gaugeCluster}>
-        <Svg width={cx * 2} height={190} style={styles.svgGauge}>
-          {Array.from({ length: 9 }).map((_, i) => {
-            const rot = startAngle + (i / 8) * sweepAngle;
-            const isRedZone = i >= 7;
-            const innerP = polarToCartesian(cx, cy, radius - 8, rot);
-            const outerP = polarToCartesian(cx, cy, radius, rot);
-            const textP = polarToCartesian(cx, cy, radius - 26, rot);
-
-            return (
-              <G key={i}>
-                <Line
-                  x1={innerP.x}
-                  y1={innerP.y}
-                  x2={outerP.x}
-                  y2={outerP.y}
-                  stroke={isRedZone ? "#FF3B30" : "#888888"}
-                  strokeWidth={2}
-                />
-                <SvgText
-                  x={textP.x}
-                  y={textP.y}
-                  fill={isRedZone ? "#FF3B30" : "#cccccc"}
-                  fontSize={14}
-                  fontWeight="bold"
-                  textAnchor="middle"
-                  alignmentBaseline="middle"
-                >
-                  {i}
-                </SvgText>
-              </G>
-            );
-          })}
-          <Path
-            d={backgroundTrack}
-            fill="none"
-            stroke="#1a1a1a"
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-          />
-          <Path
-            d={redlineTrack}
-            fill="none"
-            stroke="#FF3B30"
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-          />
-          {safeRpm > 0 && (
+    return (
+      <View style={styles.container}>
+        <View style={styles.gearContainer}>
+          <Text style={styles.gearText}>{estimatedGear}</Text>
+        </View>
+        <View style={styles.gaugeCluster}>
+          <Svg width={cx * 2} height={190} style={styles.svgGauge}>
+            {Array.from({ length: 9 }).map((_, i) => {
+              const rot = startAngle + (i / 8) * sweepAngle;
+              const isRedZone = i >= 7;
+              const innerP = polarToCartesian(cx, cy, radius - 8, rot);
+              const outerP = polarToCartesian(cx, cy, radius, rot);
+              const textP = polarToCartesian(cx, cy, radius - 26, rot);
+              return (
+                <G key={i}>
+                  <Line
+                    x1={innerP.x}
+                    y1={innerP.y}
+                    x2={outerP.x}
+                    y2={outerP.y}
+                    stroke={isRedZone ? "#FF3B30" : "#888888"}
+                    strokeWidth={2}
+                  />
+                  <SvgText
+                    x={textP.x}
+                    y={textP.y}
+                    fill={isRedZone ? "#FF3B30" : "#cccccc"}
+                    fontSize={14}
+                    fontWeight="bold"
+                    textAnchor="middle"
+                    alignmentBaseline="middle"
+                  >
+                    {i}
+                  </SvgText>
+                </G>
+              );
+            })}
             <Path
-              d={activeTrack}
+              d={backgroundTrack}
               fill="none"
-              stroke={isRedline ? "#FF3B30" : "#FFFFFF"}
-              strokeWidth={strokeWidth + 1}
+              stroke="#1a1a1a"
+              strokeWidth={strokeWidth}
               strokeLinecap="round"
             />
-          )}
-
-          <G transform={`rotate(${endAngle}, ${cx}, ${cy})`}>
-            <Polygon
-              points={`${cx - 2},${cy} ${cx},${cy - radius + 15} ${cx + 2},${cy} ${cx},${cy + 15}`}
-              fill={isRedline ? "#FF3B30" : "#FFFFFF"}
+            <Path
+              d={redlineTrack}
+              fill="none"
+              stroke="#FF3B30"
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
             />
-            <Circle
-              cx={cx}
-              cy={cy}
-              r={6}
-              fill={isRedline ? "#FF3B30" : "#FFFFFF"}
-            />
-            <Circle cx={cx} cy={cy} r={2} fill="#000" />
-          </G>
-        </Svg>
-        <View style={styles.speedContainer} pointerEvents="none">
-          {/* Angka speed sekarang mengikuti animasi yang halus */}
-          <Text style={styles.speedDigits}>{Math.round(animSpeed)}</Text>
-          <Text style={styles.speedUnit}>KM/H</Text>
+            {safeRpm > 0 && (
+              <Path
+                d={activeTrack}
+                fill="none"
+                stroke={isRedline ? "#FF3B30" : "#FFFFFF"}
+                strokeWidth={strokeWidth + 1}
+                strokeLinecap="round"
+              />
+            )}
+            <G transform={`rotate(${endAngle}, ${cx}, ${cy})`}>
+              <Polygon
+                points={`${cx - 2},${cy} ${cx},${cy - radius + 15} ${cx + 2},${cy} ${cx},${cy + 15}`}
+                fill={isRedline ? "#FF3B30" : "#FFFFFF"}
+              />
+              <Circle
+                cx={cx}
+                cy={cy}
+                r={6}
+                fill={isRedline ? "#FF3B30" : "#FFFFFF"}
+              />
+              <Circle cx={cx} cy={cy} r={2} fill="#000" />
+            </G>
+          </Svg>
+          <View style={styles.speedContainer} pointerEvents="none">
+            <Text style={styles.speedDigits}>{Math.round(animSpeed)}</Text>
+            <Text style={styles.speedUnit}>KM/H</Text>
+          </View>
+        </View>
+        <View style={styles.rpmContainer}>
+          <Text style={[styles.rpmValue, isRedline && styles.textRed]}>
+            {Math.round(animRpm).toLocaleString("id-ID")}{" "}
+            <Text style={styles.rpmUnit}>RPM</Text>
+          </Text>
         </View>
       </View>
-      <View style={styles.rpmContainer}>
-        {/* Angka RPM text di bawah lengkungan ikut animasinya */}
-        <Text style={[styles.rpmValue, isRedline && styles.textRed]}>
-          {Math.round(animRpm).toLocaleString("id-ID")}{" "}
-          <Text style={styles.rpmUnit}>RPM</Text>
-        </Text>
-      </View>
-    </View>
-  );
-}
+    );
+  },
+);
+
+export default MainGauges;
 
 const styles = StyleSheet.create({
   container: {

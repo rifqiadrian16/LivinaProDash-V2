@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { memo } from "react";
 import { Text, View } from "react-native";
 import { styles } from "../../styles/dashboard.styles";
 
-export default function SensorCard({ icon, label, value, color }: any) {
+// 1. Bungkus dengan memo()
+const SensorCard = memo(({ icon, label, value, color }: any) => {
   return (
     <View style={styles.card}>
       <Ionicons name={icon} size={20} color={color} />
@@ -11,4 +12,7 @@ export default function SensorCard({ icon, label, value, color }: any) {
       <Text style={styles.cardLabel}>{label}</Text>
     </View>
   );
-}
+});
+
+// 2. Export komponen yang sudah dibungkus
+export default SensorCard;

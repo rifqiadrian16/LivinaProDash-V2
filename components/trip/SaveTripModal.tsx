@@ -2,21 +2,22 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    Animated,
-    Keyboard,
-    Modal,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  Animated,
+  Keyboard,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
 
 interface SaveTripModalProps {
   visible: boolean;
-  onSave: (tripName: string) => void;
+  // UPDATE: onSave sekarang wajib menerima 2 parameter (nama & harga bensin)
+  onSave: (tripName: string, fuelPrice: number) => void;
   onDiscard: () => void;
 }
 
@@ -26,12 +27,15 @@ export default function SaveTripModal({
   onDiscard,
 }: SaveTripModalProps) {
   const [tripName, setTripName] = useState("");
+  const [fuelPrice, setFuelPrice] = useState("10000");
+
   const inputRef = useRef<TextInput>(null);
   const cardOffset = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
       setTripName("");
+      setFuelPrice("10000"); // Reset ke default setiap kali modal dibuka
       setTimeout(() => inputRef.current?.focus(), 300);
     }
   }, [visible]);
@@ -67,7 +71,10 @@ export default function SaveTripModal({
 
   const handleSave = () => {
     Keyboard.dismiss();
-    onSave(tripName.trim());
+    // Konversi harga bensin dari string ke angka murni (kalau kosong, otomatis 10000)
+    const finalPrice = parseInt(fuelPrice) || 10000;
+    // Kirim 2 data ini ke useDashboard
+    onSave(tripName.trim(), finalPrice);
   };
 
   const handleDiscard = () => {
@@ -96,21 +103,41 @@ export default function SaveTripModal({
             </View>
 
             <Text style={styles.title}>TRIP SELESAI</Text>
-            <Text style={styles.subtitle}>Isi Nama</Text>
+            <Text style={styles.subtitle}>Isi Nama Rute & BBM</Text>
 
-            {/* Input */}
+            {/* Input Nama Rute */}
+            <Text style={styles.labelInput}>Nama Perjalanan</Text>
             <TextInput
               ref={inputRef}
               style={styles.input}
-              placeholder="cth: Pulang Kerja, Ke Pelabuhan Ratu..."
+              placeholder="cth: Pulang Kerja, Cikidang..."
               placeholderTextColor="#555"
               value={tripName}
               onChangeText={setTripName}
               maxLength={50}
+              returnKeyType="next"
+            />
+            <Text style={styles.hint}>Kosongkan untuk nama otomatis</Text>
+
+            {/* Input Harga Bensin */}
+            <Text style={styles.labelInput}>Harga Bensin (Rp / Liter)</Text>
+            <TextInput
+              style={[
+                styles.input,
+                { marginBottom: 24, color: "#00ffcc", fontWeight: "bold" },
+              ]}
+              keyboardType="numeric"
+              placeholder="10000"
+              placeholderTextColor="#555"
+              value={fuelPrice}
+              onChangeText={(text) => {
+                // Filter hanya angka yang boleh diketik
+                const numericValue = text.replace(/[^0-9]/g, "");
+                setFuelPrice(numericValue);
+              }}
               returnKeyType="done"
               onSubmitEditing={handleSave}
             />
-            <Text style={styles.hint}>Kosongkan untuk nama otomatis</Text>
 
             {/* Tombol */}
             <View style={styles.btnRow}>
@@ -176,6 +203,13 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: "center",
   },
+  labelInput: {
+    fontSize: 12,
+    color: "#aaa",
+    alignSelf: "flex-start",
+    marginBottom: 6,
+    fontWeight: "600",
+  },
   input: {
     width: "100%",
     backgroundColor: "#111",
@@ -186,13 +220,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 14,
     color: "#ffffff",
-    marginBottom: 8,
+    marginBottom: 4,
   },
   hint: {
     fontSize: 10,
     color: "#444",
     alignSelf: "flex-start",
-    marginBottom: 24,
+    marginBottom: 16,
   },
   btnRow: {
     flexDirection: "row",

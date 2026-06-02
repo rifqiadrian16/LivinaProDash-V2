@@ -1,12 +1,12 @@
-import React from "react";
+import React, { memo } from "react";
 import { Text, View } from "react-native";
 import { styles } from "../../styles/dashboard.styles";
 import SensorCard from "./SensorCard";
 
-export default function DataGrid({ data, instFuel, avgFuel }: any) {
+// 1. Bungkus dengan memo()
+const DataGrid = memo(({ data, instFuel, avgFuel }: any) => {
   return (
     <>
-      {/* 1. FUEL ROW */}
       <View style={styles.fuelRow}>
         <View style={styles.fuelItem}>
           <Text style={styles.fuelLabel}>INST. FUEL</Text>
@@ -21,8 +21,6 @@ export default function DataGrid({ data, instFuel, avgFuel }: any) {
           </Text>
         </View>
       </View>
-
-      {/* 2. SENSOR GRID */}
       <View style={styles.gridContainer}>
         <SensorCard
           icon="flash"
@@ -61,8 +59,6 @@ export default function DataGrid({ data, instFuel, avgFuel }: any) {
           color="#e67e22"
         />
       </View>
-
-      {/* 3. TRIM CONTAINER */}
       <View style={styles.trimContainer}>
         <View style={styles.trimBox}>
           <Text style={styles.trimLabel}>STFT</Text>
@@ -75,4 +71,7 @@ export default function DataGrid({ data, instFuel, avgFuel }: any) {
       </View>
     </>
   );
-}
+});
+
+// 2. Export komponen
+export default DataGrid;

@@ -3,15 +3,28 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import * as ExpoLocation from "expo-location";
 import * as NavigationBar from "expo-navigation-bar";
 import * as ScreenOrientation from "expo-screen-orientation";
+import * as TaskManager from "expo-task-manager";
 import { useEffect, useRef, useState } from "react";
-import {
-  Animated,
-  AppState,
-  PanResponder,
-  StatusBar as RNStatusBar,
-} from "react-native";
+import { Animated, PanResponder, StatusBar as RNStatusBar } from "react-native";
 import { useAlert } from "../components/AlertContext";
+import {
+  getDB,
+  insertNewTrip,
+  insertTripPoint,
+  updateTripStats,
+} from "../utils/database";
 import useBLE from "./useBLE";
+
+const BACKGROUND_LOCATION_TASK = "LIVINA_BACKGROUND_TRACKING";
+
+TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
+  if (error) {
+    console.error("Background Task Error:", error);
+    return;
+  }
+  if (data) {
+  }
+});
 
 export default function useDashboard() {
   const { showAlert } = useAlert();
@@ -48,21 +61,21 @@ export default function useDashboard() {
   const [isRecording, setIsRecording] = useState(false);
   const [avgFuel, setAvgFuel] = useState(0);
   const sessionStats = useRef({ distance: 0, fuel: 0 });
-  const tripDataRef = useRef<any[]>([]);
+
+  // const tripDataRef = useRef<any[]>([]);
   const lastUpdateTime = useRef(Date.now());
-  const lastSaveTime = useRef(0);
+  // const lastSaveTime = useRef(0);
   const lastStatsSaveTime = useRef(0);
+
+  // === TAHANAN WAKTU UNTUK LOGGING (MENGURANGI UKURAN FILE JSON 90%) ===
+  const lastPointSaveTime = useRef(0);
+
   const currentTripId = useRef("");
   const latestLocation = useRef<ExpoLocation.LocationObjectCoords | null>(null);
   const runningStats = useRef({ distance: 0, fuel: 0, startTime: 0 });
   const isRecordingRef = useRef(isRecording);
 
-  // === MUTEX LOCK ===
-  // Mencegah tabrakan tulis (Race Condition) jika auto-save & disconnect berjalan bersamaan
-  const isSavingRef = useRef(false);
-
   const [showSaveTripModal, setShowSaveTripModal] = useState(false);
-
   const [showSettings, setShowSettings] = useState(false);
   const [obdType, setObdType] = useState<"bluetooth" | "wifi">("bluetooth");
   const [obdMac, setObdMac] = useState("");
@@ -126,6 +139,19 @@ export default function useDashboard() {
     }),
   ).current;
 
+  const [bgPermissionsGranted, setBgPermissionsGranted] = useState(false);
+
+  useEffect(() => {
+    // Minta izin ke user saat aplikasi pertama buka
+    (async () => {
+      const fg = await ExpoLocation.requestForegroundPermissionsAsync();
+      if (fg.granted) {
+        const bg = await ExpoLocation.requestBackgroundPermissionsAsync();
+        setBgPermissionsGranted(bg.granted);
+      }
+    })();
+  }, []);
+
   useEffect(() => {
     const loadInitData = async () => {
       const hour = new Date().getHours();
@@ -147,7 +173,6 @@ export default function useDashboard() {
           const buffer = JSON.parse(orphanBuffer);
 
           if (Array.isArray(buffer) && buffer.length > 5 && stats.tripId) {
-            // Ada trip terbengkalai — restore state-nya
             currentTripId.current = stats.tripId;
             runningStats.current = {
               distance: stats.distance || 0,
@@ -155,11 +180,8 @@ export default function useDashboard() {
               startTime: stats.startTime || Date.now(),
             };
 
-            // Auto-finalize sebagai auto-save
             const autoName = `Auto-Save (Recovery ${new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })})`;
-            await saveTripData(true, autoName);
-
-            // Bersihkan stats checkpoint
+            await saveTripData(autoName);
             await AsyncStorage.removeItem("@livina_running_stats");
 
             showAlert(
@@ -169,7 +191,6 @@ export default function useDashboard() {
             );
           }
         } catch (e) {
-          // Buffer atau stats corrupt, bersihkan saja
           await AsyncStorage.removeItem("@livina_trip_buffer");
           await AsyncStorage.removeItem("@livina_trip_buffer_bak");
           await AsyncStorage.removeItem("@livina_running_stats");
@@ -210,183 +231,116 @@ export default function useDashboard() {
     isRecordingRef.current = isRecording;
   }, [isRecording]);
 
-  const flushBuffer = async () => {
-    if (tripDataRef.current.length === 0) return;
-    const chunk = [...tripDataRef.current];
-    tripDataRef.current = [];
-
+  const saveTripData = (tripName: string, fuelPrice: number = 10000) => {
     try {
-      let bufferRaw = await AsyncStorage.getItem("@livina_trip_buffer");
-      let buffer: any[] = [];
-      try {
-        if (bufferRaw) {
-          const parsed = JSON.parse(bufferRaw);
-          // Defensive Check: Pastikan hasil parse adalah Array
-          buffer = Array.isArray(parsed) ? parsed : [];
-        }
-      } catch (e) {
-        const bak = await AsyncStorage.getItem("@livina_trip_buffer_bak");
-        if (bak) {
-          const parsedBak = JSON.parse(bak);
-          buffer = Array.isArray(parsedBak) ? parsedBak : [];
-        }
-      }
+      const db = getDB();
 
-      buffer = buffer.concat(chunk);
-      const str = JSON.stringify(buffer);
-
-      await AsyncStorage.setItem("@livina_trip_buffer_bak", str);
-      await AsyncStorage.setItem("@livina_trip_buffer", str);
-    } catch (e) {
-      tripDataRef.current = [...chunk, ...tripDataRef.current];
-    }
-  };
-
-  useEffect(() => {
-    const sub = AppState.addEventListener("change", (state) => {
-      if (state === "background" || state === "inactive") {
-        if (isRecordingRef.current) {
-          console.log(
-            "Aplikasi ke background! Flushing sisa RAM ke Local Storage...",
-          );
-          flushBuffer();
-        }
-      }
-    });
-    return () => sub.remove();
-  }, []);
-
-  const saveTripData = async (isFinal = false, tripName?: string) => {
-    // === IMPLEMENTASI MUTEX ===
-    if (isSavingRef.current) {
-      console.log(
-        "⏳ Data sedang disimpan proses lain, skip untuk mencegah bentrok/corrupt.",
+      // Ambil seluruh telemetri dari trip ini untuk menghitung statistik
+      const points = db.getAllSync(
+        "SELECT altitude, speed, rpm FROM trip_points WHERE trip_id = ?",
+        [currentTripId.current],
       );
-      return;
-    }
-    isSavingRef.current = true; // Kunci gembok
 
-    try {
-      await flushBuffer();
-
-      let bufferRaw = await AsyncStorage.getItem("@livina_trip_buffer");
-      let allData: any[] = [];
-      try {
-        if (bufferRaw) {
-          const parsed = JSON.parse(bufferRaw);
-          allData = Array.isArray(parsed) ? parsed : [];
-        }
-      } catch (e) {
-        const bak = await AsyncStorage.getItem("@livina_trip_buffer_bak");
-        if (bak) {
-          const parsedBak = JSON.parse(bak);
-          allData = Array.isArray(parsedBak) ? parsedBak : [];
-        }
-      }
-
-      if (allData.length < 5) return;
-
-      let existingRaw = await AsyncStorage.getItem("@livina_trips");
-      let parsedTrips: any[] = [];
-      try {
-        if (existingRaw) {
-          const pt = JSON.parse(existingRaw);
-          parsedTrips = Array.isArray(pt) ? pt : [];
-        }
-      } catch (e) {
-        const bakTrips = await AsyncStorage.getItem("@livina_trips_bak");
-        if (bakTrips) {
-          const ptBak = JSON.parse(bakTrips);
-          parsedTrips = Array.isArray(ptBak) ? ptBak : [];
-        }
-      }
-
-      const topSpeed = Math.max(...allData.map((d) => d.speed));
-      const fuelUsed = runningStats.current.fuel.toFixed(1);
+      let topSpeed = 0;
+      let maxRpm = 0;
       let peakAlt = 0;
       let totalClimb = 0;
       let previousAlt: number | null = null;
 
-      allData.forEach((point) => {
-        const currentAlt = point.altitude || 0;
-        if (currentAlt > peakAlt) peakAlt = currentAlt;
-        if (previousAlt !== null && currentAlt > previousAlt)
-          totalClimb += currentAlt - previousAlt;
-        previousAlt = currentAlt;
+      points.forEach((p: any) => {
+        if (p.speed > topSpeed) topSpeed = p.speed;
+        if (p.rpm > maxRpm) maxRpm = p.rpm;
+        if (p.altitude > peakAlt) peakAlt = p.altitude;
+        if (previousAlt !== null && p.altitude > previousAlt)
+          totalClimb += p.altitude - previousAlt;
+        previousAlt = p.altitude;
       });
 
-      const defaultName = `Livina Drive (${new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })})`;
-      const newTrip = {
-        id: currentTripId.current,
-        date: new Date().toLocaleDateString("id-ID", {
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        }),
-        route: tripName?.trim() || defaultName,
+      const fuelUsed = runningStats.current.fuel.toFixed(1);
+
+      // Kunci datanya!
+      const finalStats = {
+        route: tripName.trim() || `Livina Drive`,
         distance: runningStats.current.distance.toFixed(1) + " km",
         time:
           Math.round((Date.now() - runningStats.current.startTime) / 60000) +
           "m",
         fuel: fuelUsed + " L",
         ecoScore: topSpeed > 110 ? 60 : 90,
-        details: {
-          topSpeed: topSpeed + " km/h",
-          maxRpm: Math.max(...allData.map((d) => d.rpm)),
-          fuelUsed: fuelUsed + " L",
-          cost:
-            "Rp " +
-            Math.round(runningStats.current.fuel * 10000).toLocaleString(
-              "id-ID",
-            ),
-          peakAlt: Math.round(peakAlt).toString(),
-          climb: Math.round(totalClimb).toString(),
-        },
-        routeData: allData,
+        topSpeed: topSpeed + " km/h",
+        maxRpm: maxRpm,
+        cost:
+          "Rp " +
+          Math.round(runningStats.current.fuel * fuelPrice).toLocaleString(
+            "id-ID",
+          ),
+        peakAlt: Math.round(peakAlt).toString(),
+        climb: Math.round(totalClimb).toString(),
       };
 
-      const idx = parsedTrips.findIndex(
-        (t: any) => t.id === currentTripId.current,
-      );
-      if (idx !== -1) parsedTrips[idx] = newTrip;
-      else parsedTrips.unshift(newTrip);
+      updateTripStats(currentTripId.current, finalStats);
 
-      const strTrips = JSON.stringify(parsedTrips);
-      await AsyncStorage.setItem("@livina_trips_bak", strTrips);
-      await AsyncStorage.setItem("@livina_trips", strTrips);
-
-      if (isFinal) {
-        await AsyncStorage.removeItem("@livina_trip_buffer");
-        await AsyncStorage.removeItem("@livina_trip_buffer_bak");
-        showAlert("Trip Tersimpan", "Riwayat perjalanan diamankan.", "success");
-      }
-    } catch (e) {
-      console.log("[SAVE TRIP ERROR]", e);
-    } finally {
-      isSavingRef.current = false; // Buka gembok kembali
+      // Bersihkan indikator live
+      AsyncStorage.removeItem("@livina_running_stats");
+      showAlert("Tersimpan!", "Data perjalanan aman di Database.", "success");
+    } catch (error) {
+      console.error("[DB SAVE ERROR]", error);
+      showAlert("Error", "Gagal merangkum data perjalanan.", "error");
     }
   };
 
-  const toggleRecording = () => {
+  const toggleRecording = async () => {
     if (!isRecording) {
-      tripDataRef.current = [];
+      const newTripId = Date.now().toString();
+      currentTripId.current = newTripId;
       runningStats.current = { distance: 0, fuel: 0, startTime: Date.now() };
-      currentTripId.current = Date.now().toString();
       lastUpdateTime.current = Date.now();
-      lastSaveTime.current = Date.now();
-      isSavingRef.current = false;
-      AsyncStorage.multiRemove([
-        "@livina_trip_buffer",
-        "@livina_trip_buffer_bak",
-        "@livina_running_stats",
-      ]).then(() => {
-        setIsRecording(true);
-        activateKeepAwakeAsync("recording");
-        showAlert("Recording", "GPS & Telemetri aktif.", "success");
-      });
+      lastPointSaveTime.current = Date.now();
+
+      insertNewTrip(newTripId, "Merekam...");
+
+      setIsRecording(true);
+      activateKeepAwakeAsync("recording");
+
+      // === AKTIFKAN FOREGROUND SERVICE ===
+      if (bgPermissionsGranted) {
+        try {
+          await ExpoLocation.startLocationUpdatesAsync(
+            BACKGROUND_LOCATION_TASK,
+            {
+              accuracy: ExpoLocation.Accuracy.High,
+              timeInterval: 2000,
+              distanceInterval: 1,
+              // Ini yang bikin notifikasi melayang anti-kill muncul!
+              foregroundService: {
+                notificationTitle: "LivinaProDash Aktif",
+                notificationBody:
+                  "Merekam telemetri & koordinat GPS di latar belakang...",
+                notificationColor: "#00ffcc",
+              },
+            },
+          );
+        } catch (err) {
+          console.log("Gagal start background task", err);
+        }
+      }
+
+      showAlert(
+        "Recording",
+        "GPS & Telemetri aktif merekam ke Database.",
+        "success",
+      );
     } else {
       setIsRecording(false);
       deactivateKeepAwake("recording");
+
+      // === MATIKAN FOREGROUND SERVICE ===
+      try {
+        await ExpoLocation.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+      } catch (err) {
+        // Abaikan kalau memang gak jalan
+      }
+
       setShowSaveTripModal(true);
     }
   };
@@ -394,18 +348,25 @@ export default function useDashboard() {
   const confirmSaveTrip = (tripName: string) => {
     setShowSaveTripModal(false);
     AsyncStorage.removeItem("@livina_running_stats");
-    saveTripData(true, tripName);
+    saveTripData(tripName);
   };
 
   const discardTrip = () => {
     setShowSaveTripModal(false);
-    tripDataRef.current = [];
-    AsyncStorage.multiRemove([
-      "@livina_trip_buffer",
-      "@livina_trip_buffer_bak",
-      "@livina_running_stats", // ← tambah ini
-    ]);
-    showAlert("Dibatalkan", "Trip tidak disimpan.", "error");
+
+    try {
+      const db = getDB();
+      db.execSync(`DELETE FROM trips WHERE id = '${currentTripId.current}';`);
+    } catch (e) {
+      console.log("Gagal hapus trip dari DB:", e);
+    }
+
+    AsyncStorage.removeItem("@livina_running_stats");
+    showAlert(
+      "Dibatalkan",
+      "Trip tidak disimpan dan dihapus dari memori.",
+      "error",
+    );
   };
 
   const handleRawText = (raw: string) => {
@@ -450,24 +411,22 @@ export default function useDashboard() {
     const dt = (now - lastUpdateTime.current) / 3600000;
     lastUpdateTime.current = now;
 
+    // === RUMUS BENSIN BARU (LEBIH REALISTIS / TIDAK TERLALU IRIT) ===
     let targetAFR = 14.7;
-    if (newData.th > 50) targetAFR = 12.0;
-    else if (newData.th > 30) targetAFR = 13.5;
 
-    let fuelFlow = (newData.m / targetAFR / 740.0) * 3600.0;
-    const fuelCalibration = 1.15;
+    if (newData.th > 60) targetAFR = 11.5;
+    else if (newData.th > 40) targetAFR = 12.5;
+    else if (newData.th > 20) targetAFR = 13.5;
+
+    let fuelFlow = (newData.m / targetAFR / 730.0) * 3600.0;
+
+    const fuelCalibration = 1.28;
     fuelFlow =
       fuelFlow * (1 + (newData.st + newData.lt) / 100) * fuelCalibration;
 
-    const isDFCO = newData.th === 0 && newData.s > 20 && newData.r > 1200;
+    const isDFCO = newData.th < 0 && newData.s > 20 && newData.r > 1200;
     if (isDFCO) fuelFlow = 0;
-
-    if (dt > 0 && dt < 0.003) {
-      sessionStats.current.distance += newData.s * dt;
-      sessionStats.current.fuel += fuelFlow * dt;
-      if (sessionStats.current.fuel > 0)
-        setAvgFuel(sessionStats.current.distance / sessionStats.current.fuel);
-    }
+    // ===============================================================
 
     if (isRecordingRef.current) {
       if (dt > 0 && dt < 0.003) {
@@ -486,46 +445,43 @@ export default function useDashboard() {
         }
       }
 
-      let recInst = 0.0;
-      if (isDFCO) recInst = 99.9;
-      else if (newData.s > 2 && fuelFlow > 0)
-        recInst = Math.min(newData.s / fuelFlow, 99.9);
+      // DATA LOGGER (THROTTLED): 2 Detik Sekali
+      if (now - lastPointSaveTime.current > 2000) {
+        lastPointSaveTime.current = now;
 
-      tripDataRef.current.push({
-        latitude: latestLocation.current?.latitude || 0,
-        longitude: latestLocation.current?.longitude || 0,
-        altitude: latestLocation.current?.altitude || 0,
-        speed: newData.s,
-        rpm: newData.r,
-        temp: newData.t,
-        iat: newData.i,
-        maf: newData.m,
-        stft: newData.st,
-        ltft: newData.lt,
-        timing: newData.tm,
-        volt: newData.v,
-        throttle: newData.th,
-        instFuel: recInst.toFixed(1),
-        time: new Date().toLocaleTimeString("id-ID", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        note: isDFCO
-          ? "DFCO Active (Fuel Cut)"
-          : newData.s > 80
-            ? "High Speed"
-            : newData.r > 3500
-              ? "Aggressive"
-              : "Cruising",
-      });
+        let recInst = 0.0;
+        if (isDFCO) recInst = 99.9;
+        else if (newData.s > 2 && fuelFlow > 0)
+          recInst = Math.min(newData.s / fuelFlow, 99.9);
 
-      if (tripDataRef.current.length >= 100) {
-        flushBuffer();
-      }
-
-      if (now - lastSaveTime.current > 30000) {
-        lastSaveTime.current = now;
-        saveTripData(false);
+        // Langsung Tembak Baris Baru ke SQLite! (0% RAM)
+        insertTripPoint(currentTripId.current, {
+          latitude: latestLocation.current?.latitude || 0,
+          longitude: latestLocation.current?.longitude || 0,
+          altitude: latestLocation.current?.altitude || 0,
+          speed: newData.s,
+          rpm: newData.r,
+          temp: newData.t,
+          iat: newData.i,
+          maf: newData.m,
+          stft: newData.st,
+          ltft: newData.lt,
+          timing: newData.tm,
+          volt: newData.v,
+          throttle: newData.th,
+          instFuel: recInst.toFixed(1),
+          time: new Date().toLocaleTimeString("id-ID", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          note: isDFCO
+            ? "Engine Brake (0%)"
+            : newData.s > 80
+              ? "High Speed"
+              : newData.r > 3500
+                ? "Aggressive"
+                : "Cruising",
+        });
       }
     }
   };
@@ -588,22 +544,18 @@ export default function useDashboard() {
 
       if (isRecordingRef.current) {
         console.log("⚠️ BLE Putus! Memicu Auto-Save Trip...");
-
-        // FIX RACE CONDITION: Pastikan state Ref dimatikan duluan sebelum simpan
         setIsRecording(false);
         isRecordingRef.current = false;
         deactivateKeepAwake("recording");
 
-        // Beri jeda 300ms agar jika ada proses flush/batching yang sedang berjalan bisa selesai dulu
         setTimeout(() => {
           const autoName = `Auto-Save (${new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })})`;
-          saveTripData(true, autoName).then(() => {
-            showAlert(
-              "Koneksi Terputus",
-              "Sistem mematikan perekaman dan mengamankan data otomatis.",
-              "success",
-            );
-          });
+          saveTripData(autoName);
+          showAlert(
+            "Koneksi Terputus",
+            "Sistem mematikan perekaman dan mengamankan data otomatis.",
+            "success",
+          );
         }, 300);
       }
     } else {
@@ -652,15 +604,18 @@ export default function useDashboard() {
         return showAlert("Error", "MAC/PIN kosong!", "error");
       await AsyncStorage.setItem("@obd_mac", obdMac);
       await AsyncStorage.setItem("@obd_pin", obdPin);
+
+      // Murni dijejerin saja, Queue yang akan mengaturnya!
       sendMessage(`SET_OBD_MAC:${obdMac}`);
-      setTimeout(() => sendMessage(`SET_OBD_PIN:${obdPin}`), 300);
-      setTimeout(() => sendMessage("SET_MODE_1"), 600);
+      sendMessage(`SET_OBD_PIN:${obdPin}`);
+      sendMessage("SET_MODE_1");
     } else {
       if (!obdWifiSsid) return showAlert("Error", "SSID kosong!", "error");
+
       sendMessage(`SET_OBD_WIFI_SSID:${obdWifiSsid}`);
-      setTimeout(() => sendMessage(`SET_OBD_WIFI_IP:${obdIp}`), 300);
-      setTimeout(() => sendMessage(`SET_OBD_WIFI_PORT:${obdPort}`), 600);
-      setTimeout(() => sendMessage("SET_MODE_2"), 900);
+      sendMessage(`SET_OBD_WIFI_IP:${obdIp}`);
+      sendMessage(`SET_OBD_WIFI_PORT:${obdPort}`);
+      sendMessage("SET_MODE_2");
     }
     setShowSettings(false);
     showAlert("Konfigurasi Tersimpan", "ESP32 akan restart.", "success");
@@ -772,29 +727,27 @@ export default function useDashboard() {
     await AsyncStorage.setItem("@ota_pass", otaPass);
     setShowOTAModal(false);
 
-    setTimeout(() => {
-      setConfirmAlert({
-        visible: true,
-        title: "Masuk Mode Update (OTA)?",
-        message: `Modul akan restart dan mencari Hotspot:\n"${otaSsid}"\n\nPastikan Hotspot HP Mas sudah aktif.`,
-        confirmText: "Ya",
-        cancelText: "Batal",
-        isDanger: true,
-        onConfirm: () => {
-          sendMessage(`WIFI_SSID:${otaSsid}`);
-          setTimeout(() => sendMessage(`WIFI_PASS:${otaPass}`), 300);
-          setTimeout(() => {
-            sendMessage("SET_MODE_0");
-            setConfirmAlert((prev) => ({ ...prev, visible: false }));
-            showAlert(
-              "Mode OTA Aktif",
-              `Nyalakan Hotspot "${otaSsid}" dan buka Aplikasi OTA.`,
-              "success",
-            );
-          }, 600);
-        },
-      });
-    }, 300);
+    setConfirmAlert({
+      visible: true,
+      title: "Masuk Mode Update (OTA)?",
+      message: `Modul akan restart dan mencari Hotspot:\n"${otaSsid}"\n\nPastikan Hotspot HP Mas sudah aktif.`,
+      confirmText: "Ya",
+      cancelText: "Batal",
+      isDanger: true,
+      onConfirm: () => {
+        // Bebas tumpuk perintah, aman 100%!
+        sendMessage(`WIFI_SSID:${otaSsid}`);
+        sendMessage(`WIFI_PASS:${otaPass}`);
+        sendMessage("SET_MODE_0");
+
+        setConfirmAlert((prev) => ({ ...prev, visible: false }));
+        showAlert(
+          "Mode OTA Aktif",
+          `Nyalakan Hotspot "${otaSsid}" dan buka Aplikasi OTA.`,
+          "success",
+        );
+      },
+    });
   };
 
   let targetAFR = 14.7;

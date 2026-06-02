@@ -4,7 +4,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Slider from "@react-native-community/slider";
 import * as FileSystem from "expo-file-system/legacy";
 import { useFocusEffect } from "expo-router";
-import * as Sharing from "expo-sharing";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -24,6 +23,7 @@ import { useAlert } from "../../components/AlertContext";
 // === IMPORT KOMPONEN & STYLE YANG SUDAH DIPISAH ===
 import ShareModal from "../../components/trip/ShareModal";
 import { tripStyles as styles } from "../../styles/trip.styles";
+import { getDB } from "../../utils/database";
 import { getMapHtml } from "../../utils/tripTemplates";
 
 export default function TripScreen() {
@@ -46,30 +46,47 @@ export default function TripScreen() {
   const [lifetimeAvgFuel, setLifetimeAvgFuel] = useState("0.0");
   const insets = useSafeAreaInsets();
 
+  const getTripPoints = (tripId: string) => {
+    try {
+      const db = getDB();
+      return db.getAllSync(
+        "SELECT * FROM trip_points WHERE trip_id = ? ORDER BY id ASC",
+        [tripId],
+      );
+    } catch (error) {
+      console.error("Gagal tarik telemetri:", error);
+      return [];
+    }
+  };
+
   const deleteTrip = (tripId: string) => {
     showConfirm(
       "Hapus Perjalanan",
       "Yakin untuk menghapus perjalanan ini secara permanen?",
-      async () => {
+      () => {
         try {
-          const updatedTrips = tripHistory.filter((t) => t.id !== tripId);
+          const db = getDB();
+          db.execSync(`DELETE FROM trips WHERE id = '${tripId}'`);
 
-          await AsyncStorage.setItem(
-            "@livina_trips",
-            JSON.stringify(updatedTrips),
+          syncTrips(); // Refresh layar
+          setSelectedTrip(null); // Tutup modal
+          showAlert(
+            "TERHAPUS",
+            "Data perjalanan berhasil dibumihanguskan.",
+            "success",
           );
-          setTripHistory(updatedTrips);
-          setSelectedTrip(null);
-
-          showAlert("TERHAPUS", "Data perjalanan berhasil dihapus.", "success");
         } catch (error) {
-          showAlert("GAGAL", "Terjadi kesalahan saat menghapus data.", "error");
+          showAlert(
+            "GAGAL",
+            "Terjadi kesalahan saat menghapus data DB.",
+            "error",
+          );
         }
       },
     );
   };
 
-  const exportToCSV = async (trip: any) => {
+  const downloadToDevice = async (trip: any) => {
     if (!trip || !trip.routeData || trip.routeData.length === 0) {
       showAlert(
         "KOSONG",
@@ -91,456 +108,358 @@ export default function TripScreen() {
       });
 
       const safeDateName = trip.date.replace(/ /g, "_").replace(/,/g, "");
-      const fileUri =
-        FileSystem.documentDirectory + `Telemetry_Log_${safeDateName}.csv`;
+      const fileName = `Telemetry_Log_${safeDateName}.csv`;
 
-      await FileSystem.writeAsStringAsync(fileUri, csvString);
+      // ==========================================
+      // BAGIAN BARU: DOWNLOAD KE FOLDER INTERNAL HP
+      // ==========================================
+      let directoryUri = await AsyncStorage.getItem("@livina_export_dir");
 
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (isAvailable) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: "text/csv",
-          dialogTitle: `Ekspor Telemetri: ${trip.route}`,
-          UTI: "public.comma-separated-values-text",
+      if (!directoryUri) {
+        showAlert(
+          "SETUP PENYIMPANAN",
+          "Silakan pilih atau buat folder (misal: Documents/Livina) untuk menyimpan file CSV.",
+          "info",
+        );
+
+        // Jeda agar alert sempat terbaca sebelum File Manager HP terbuka
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+
+        const permissions =
+          await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+
+        if (permissions.granted) {
+          directoryUri = permissions.directoryUri;
+          await AsyncStorage.setItem("@livina_export_dir", directoryUri);
+        } else {
+          showAlert("BATAL", "Izin akses folder tidak diberikan.", "warning");
+          return;
+        }
+      }
+
+      try {
+        const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
+          directoryUri,
+          fileName,
+          "text/csv",
+        );
+
+        await FileSystem.writeAsStringAsync(fileUri, csvString, {
+          encoding: FileSystem.EncodingType.UTF8,
         });
-      } else {
-        showAlert("GAGAL", "Fitur berbagi tidak didukung di HP ini.", "error");
+
+        showAlert(
+          "SUKSES",
+          `File berhasil di-download dengan nama:\n${fileName}`,
+          "success",
+        );
+      } catch (writeError) {
+        console.log("Folder default hilang. Reset folder...", writeError);
+        await AsyncStorage.removeItem("@livina_export_dir");
+        showAlert(
+          "FOLDER HILANG",
+          "Folder lama terhapus/pindah. Silakan klik Download lagi untuk setup ulang.",
+          "error",
+        );
       }
     } catch (error) {
       showAlert("SYSTEM ERROR", String(error), "error");
     }
   };
 
-  const syncTrips = async () => {
+  const syncTrips = () => {
     setIsSyncing(true);
     try {
-      const storedTrips = await AsyncStorage.getItem("@livina_trips");
-      if (storedTrips !== null) {
-        try {
-          setTripHistory(JSON.parse(storedTrips));
-        } catch (parseError) {
-          console.log("🚨 Data trip korup ditemukan. Membersihkan file...");
-          await AsyncStorage.removeItem("@livina_trips");
-          setTripHistory([]);
-          showAlert(
-            "SYSTEM RECOVERY",
-            "Sistem mendeteksi dan membersihkan data yang rusak akibat Force Close.",
-            "error",
-          );
-        }
-      } else {
-        setTripHistory([]);
-      }
+      const db = getDB();
+      // AUTO-HEAL: Bersihkan "Ghost Trip" kalau kemarin sempat Force Close
+      db.execSync(`DELETE FROM trips WHERE route = 'Merekam...'`);
+
+      // Sedot data header trip dari SQLite
+      const savedTrips = db.getAllSync("SELECT * FROM trips ORDER BY id DESC");
+
+      // SQLite mengembalikan string JSON untuk details, kita parse dulu
+      const formattedTrips = savedTrips.map((t: any) => ({
+        ...t,
+        details: {
+          topSpeed: t.topSpeed,
+          maxRpm: t.maxRpm,
+          fuelUsed: t.fuel,
+          cost: t.cost,
+          peakAlt: t.peakAlt,
+          climb: t.climb,
+        },
+      }));
+
+      setTripHistory(formattedTrips);
     } catch (error) {
-      showAlert("GAGAL SINKRONISASI", "Tidak dapat memuat data.", "error");
+      console.error("Gagal load DB:", error);
+      showAlert(
+        "GAGAL SINKRONISASI",
+        "Tidak dapat memuat data dari database.",
+        "error",
+      );
     } finally {
-      setTimeout(() => setIsSyncing(false), 1000);
+      setTimeout(() => setIsSyncing(false), 500);
     }
   };
 
-  const recoverOrphanTrip = async () => {
+  const nukeStorage = () => {
     try {
-      // Karena buffer terlalu besar untuk dibaca,
-      // kita buat trip stub dari stats checkpoint saja
-      const statsRaw = await AsyncStorage.getItem("@livina_running_stats");
-      const tripsBak = await AsyncStorage.getItem("@livina_trips_bak");
-
-      // KASUS 1: Coba pulihkan dari trips_bak dulu (paling aman)
-      if (tripsBak) {
-        try {
-          const bak = JSON.parse(tripsBak);
-          if (Array.isArray(bak) && bak.length > 0) {
-            await AsyncStorage.setItem("@livina_trips", tripsBak);
-            // Bersihkan buffer yang oversized
-            await AsyncStorage.multiRemove([
-              "@livina_trip_buffer",
-              "@livina_trip_buffer_bak",
-              "@livina_running_stats",
-            ]);
-            showAlert(
-              "SUKSES",
-              `${bak.length} trip dipulihkan dari backup!`,
-              "success",
-            );
-            syncTrips();
-            return;
-          }
-        } catch (e) {}
-      }
-
-      // KASUS 2: Tidak ada backup trip, tapi ada stats checkpoint
-      // Buat trip stub tanpa routeData (peta kosong, stats ada)
-      if (statsRaw) {
-        try {
-          const stats = JSON.parse(statsRaw);
-          if (stats.tripId && stats.distance > 0) {
-            const stubTrip = {
-              id: stats.tripId,
-              date: new Date().toLocaleDateString("id-ID", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              }),
-              route: `Trip Dipulihkan (peta tidak tersedia)`,
-              distance: stats.distance.toFixed(1) + " km",
-              time: Math.round((Date.now() - stats.startTime) / 60000) + "m",
-              fuel: stats.fuel > 0 ? stats.fuel.toFixed(1) + " L" : "~",
-              ecoScore: 80,
-              details: {
-                topSpeed: "~",
-                maxRpm: 0,
-                fuelUsed: stats.fuel > 0 ? stats.fuel.toFixed(1) + " L" : "~",
-                cost:
-                  stats.fuel > 0
-                    ? "Rp " +
-                      Math.round(stats.fuel * 10000).toLocaleString("id-ID")
-                    : "~",
-                peakAlt: "~",
-                climb: "~",
-              },
-              routeData: [], // kosong karena buffer tidak bisa dibaca
-            };
-
-            const existingRaw = await AsyncStorage.getItem("@livina_trips");
-            let existing: any[] = [];
-            try {
-              if (existingRaw) existing = JSON.parse(existingRaw);
-            } catch (e) {}
-            if (!Array.isArray(existing)) existing = [];
-
-            existing.unshift(stubTrip);
-            await AsyncStorage.setItem(
-              "@livina_trips",
-              JSON.stringify(existing),
-            );
-            await AsyncStorage.multiRemove([
-              "@livina_trip_buffer",
-              "@livina_trip_buffer_bak",
-              "@livina_running_stats",
-            ]);
-
-            showAlert(
-              "DIPULIHKAN SEBAGIAN",
-              `Jarak ${stubTrip.distance} diselamatkan. Data peta tidak bisa dibaca karena terlalu besar.`,
-              "success",
-            );
-            syncTrips();
-            return;
-          }
-        } catch (e) {}
-      }
-
-      // KASUS 3: Tidak ada apapun — hapus buffer oversized supaya app tidak crash terus
-      await AsyncStorage.multiRemove([
-        "@livina_trip_buffer",
-        "@livina_trip_buffer_bak",
-        "@livina_running_stats",
-      ]);
-      showAlert(
-        "TIDAK ADA DATA",
-        "Buffer terlalu besar dan tidak ada backup. Storage dibersihkan.",
-        "error",
-      );
-    } catch (e) {
-      // Kalau bahkan getItem statsRaw pun error, paksa bersihkan semua
-      await AsyncStorage.multiRemove([
-        "@livina_trip_buffer",
-        "@livina_trip_buffer_bak",
-        "@livina_running_stats",
-      ]);
-      showAlert(
-        "DIBERSIHKAN",
-        "Storage error dibersihkan. Silakan coba trip berikutnya.",
-        "error",
-      );
+      const db = getDB();
+      db.execSync("DELETE FROM trips"); // Ini otomatis hapus tabel trip_points juga
+      setTripHistory([]);
+      showAlert("BERSIH", "Database SQLite direset total!", "success");
+    } catch (error) {
+      showAlert("GAGAL", "Gagal mereset database.", "error");
     }
   };
 
-  const nukeStorage = async () => {
-    await AsyncStorage.multiRemove([
-      "@livina_trips",
-      "@livina_trips_bak",
-      "@livina_trip_buffer",
-      "@livina_trip_buffer_bak",
-      "@livina_running_stats",
-    ]);
-    setTripHistory([]);
-    showAlert("BERSIH", "Semua storage trup dibersihkan", "success");
-  };
-
-  const injectDummyData = async () => {
+  const injectDummyData = () => {
+    // Bikin ID pakai Date.now() biar bisa ditekan berkali-kali tanpa error duplikat
     const dummyTrips = [
       // ---------------------------------------------------------
-      // RUTE 1: CIKIDANG (EKSTREM & ZIG-ZAG)
+      // RUTE 1: TOL BOCIMI (HIGH SPEED CRUISING)
       // ---------------------------------------------------------
       {
-        id: "dummy-trip-cikidang",
-        date: "24 Mei 2026, 07:15",
-        route: "Jalur Ekstrem Cikidang",
-        distance: "42.8 km",
-        time: "1h 10m",
-        fuel: "3.2 L",
-        ecoScore: 65, // Merah/Kuning karena sering RPM tinggi di tanjakan
+        id: `dummy-bocimi-${Date.now()}`,
+        date: "02 Jun 2026, 06:30",
+        route: "Tol Bocimi (Parungkuda - Ciawi)",
+        distance: "35.5 km",
+        time: "30m",
+        fuel: "2.1 L",
+        ecoScore: 85, // Cukup efisien karena gigi konstan walau kencang
         details: {
-          topSpeed: "85",
-          maxRpm: "4500",
-          fuelUsed: "3.2",
-          cost: "Rp 32.000",
-          peakAlt: "850",
-          climb: "720",
+          topSpeed: "120",
+          maxRpm: "3500",
+          fuelUsed: "2.1",
+          cost: "Rp 21.000",
+          peakAlt: "520",
+          climb: "150",
         },
         routeData: [
           {
-            time: "07:15",
-            latitude: -6.89,
-            longitude: 106.78,
+            time: "06:30",
+            latitude: -6.84,
+            longitude: 106.77,
             speed: 40,
-            rpm: 2000,
+            rpm: 1800,
             temp: 85,
             instFuel: 12.0,
-            iat: 32,
+            iat: 30,
             maf: 14.5,
             stft: 1,
             timing: 15,
             throttle: 15,
-            note: "Start Cibadak",
+            note: "Gerbang Tol Parungkuda",
           },
           {
-            time: "07:25",
-            latitude: -6.905,
-            longitude: 106.75,
-            speed: 60,
+            time: "06:40",
+            latitude: -6.78,
+            longitude: 106.81,
+            speed: 100,
             rpm: 2800,
             temp: 88,
-            instFuel: 10.5,
-            iat: 33,
-            maf: 20.1,
+            instFuel: 16.5,
+            iat: 31,
+            maf: 22.1,
             stft: -2,
-            timing: 22,
-            throttle: 25,
-            note: "Masuk Jalur Alternatif",
+            timing: 32,
+            throttle: 20,
+            note: "Cruising Stabil",
           },
           {
-            time: "07:35",
-            latitude: -6.895,
-            longitude: 106.73,
-            speed: 35,
-            rpm: 3200,
+            time: "06:45",
+            latitude: -6.72,
+            longitude: 106.83,
+            speed: 120,
+            rpm: 3500,
             temp: 92,
-            instFuel: 8.5,
-            iat: 34,
-            maf: 25.0,
+            instFuel: 10.5,
+            iat: 32,
+            maf: 30.0,
             stft: 3,
-            timing: 28,
-            throttle: 45,
-            note: "Hairpin 1 - Gaspol",
+            timing: 38,
+            throttle: 35,
+            note: "Overtaking (Gaspol)",
           },
           {
-            time: "07:42",
-            latitude: -6.915,
-            longitude: 106.71,
-            speed: 45,
-            rpm: 2500,
-            temp: 90,
-            instFuel: 11.0,
-            iat: 33,
+            time: "06:55",
+            latitude: -6.68,
+            longitude: 106.84,
+            speed: 80,
+            rpm: 2200,
+            temp: 89,
+            instFuel: 18.0,
+            iat: 31,
             maf: 18.0,
             stft: 0,
-            timing: 18,
-            throttle: 20,
-            note: "Turunan Pendek",
+            timing: 28,
+            throttle: 15,
+            note: "Turunan (Eco Mode)",
           },
           {
-            time: "07:50",
-            latitude: -6.905,
-            longitude: 106.69,
+            time: "07:00",
+            latitude: -6.65,
+            longitude: 106.85,
             speed: 30,
-            rpm: 4000,
-            temp: 95,
-            instFuel: 6.5,
-            iat: 36,
-            maf: 30.5,
-            stft: 5,
-            timing: 30,
-            throttle: 60,
-            note: "Hairpin 2 - Tanjakan Curam",
-          },
-          {
-            time: "07:58",
-            latitude: -6.925,
-            longitude: 106.67,
-            speed: 50,
-            rpm: 2200,
-            temp: 91,
+            rpm: 1500,
+            temp: 86,
             instFuel: 14.0,
-            iat: 35,
-            maf: 15.2,
-            stft: -1,
-            timing: 16,
-            throttle: 18,
-            note: "Jalan Agak Lurus",
-          },
-          {
-            time: "08:05",
-            latitude: -6.91,
-            longitude: 106.65,
-            speed: 25,
-            rpm: 4500,
-            temp: 97,
-            instFuel: 5.0,
-            iat: 38,
-            maf: 35.0,
-            stft: 6,
-            timing: 35,
-            throttle: 70,
-            note: "Puncak Cikidang",
-          },
-          {
-            time: "08:15",
-            latitude: -6.94,
-            longitude: 106.62,
-            speed: 70,
-            rpm: 2800,
-            temp: 88,
-            instFuel: 25.0,
-            iat: 32,
-            maf: 10.0,
-            stft: -3,
-            timing: 10,
-            throttle: 0,
-            note: "Engine Brake Turunan",
-          },
-          {
-            time: "08:25",
-            latitude: -6.98,
-            longitude: 106.55,
-            speed: 40,
-            rpm: 2000,
-            temp: 85,
-            instFuel: 15.0,
-            iat: 31,
+            iat: 33,
             maf: 12.0,
-            stft: 0,
+            stft: -1,
             timing: 14,
-            throttle: 12,
-            note: "Finish Pelabuhan Ratu",
+            throttle: 10,
+            note: "Keluar GT Ciawi",
           },
         ],
       },
       // ---------------------------------------------------------
-      // RUTE 2: SITU GUNUNG (KOTA -> PEGUNUNGAN)
+      // RUTE 2: MACET KOTA
       // ---------------------------------------------------------
       {
-        id: "dummy-trip-situgunung",
-        date: "25 Mei 2026, 09:00",
-        route: "Jalur Wisata Situ Gunung",
-        distance: "15.2 km",
+        id: `dummy-macet-${Date.now()}`,
+        date: "02 Jun 2026, 16:45",
+        route: "Macet Jl. A. Yani - Cisaat",
+        distance: "4.2 km",
         time: "45m",
-        fuel: "1.5 L",
-        ecoScore: 82, // Hijau/Bagus karena lari konstan walau nanjak
+        fuel: "0.8 L",
+        ecoScore: 40, // Jelek karena banyak diam (idle) tapi bensin ngucur
         details: {
-          topSpeed: "60",
-          maxRpm: "3000",
-          fuelUsed: "1.5",
-          cost: "Rp 15.000",
-          peakAlt: "1050", // Situ Gunung lebih tinggi (meter)
-          climb: "540",
+          topSpeed: "35",
+          maxRpm: "2200",
+          fuelUsed: "0.8",
+          cost: "Rp 8.000",
+          peakAlt: "600",
+          climb: "40",
         },
         routeData: [
-          // Start: Kota
           {
-            time: "09:00",
-            latitude: -6.925,
-            longitude: 106.925,
-            speed: 20,
-            rpm: 1500,
-            temp: 82,
-            instFuel: 10.0,
-            iat: 35,
-            maf: 10.5,
-            stft: 2,
-            timing: 12,
-            throttle: 10,
-            note: "Start Pusat Kota",
-          },
-          // Lewat Cisaat (Macet dikit)
-          {
-            time: "09:15",
-            latitude: -6.915,
-            longitude: 106.905,
-            speed: 30,
-            rpm: 1800,
-            temp: 88,
-            instFuel: 11.5,
-            iat: 36,
-            maf: 12.1,
-            stft: 1,
-            timing: 14,
-            throttle: 12,
-            note: "Lalin Padat Cisaat",
-          },
-          // Belok Kanan Polsek Kadudampit (Mulai Nanjak)
-          {
-            time: "09:25",
-            latitude: -6.895,
-            longitude: 106.9,
-            speed: 45,
-            rpm: 2500,
-            temp: 90,
-            instFuel: 8.5,
-            iat: 32,
-            maf: 18.0,
-            stft: 0,
-            timing: 20,
-            throttle: 25,
-            note: "Masuk Kadudampit",
-          },
-          // Tanjakan Panjang Kadudampit (Udara mulai dingin)
-          {
-            time: "09:35",
-            latitude: -6.865,
-            longitude: 106.91,
-            speed: 40,
-            rpm: 3000,
-            temp: 93,
-            instFuel: 7.0,
-            iat: 28,
-            maf: 22.5,
-            stft: 4,
-            timing: 25,
-            throttle: 35,
-            note: "Tanjakan Konsisten",
-          },
-          // Finish: Parkiran Situ Gunung (Udara sangat dingin)
-          {
-            time: "09:45",
-            latitude: -6.835,
+            time: "16:45",
+            latitude: -6.92,
             longitude: 106.92,
             speed: 10,
-            rpm: 800,
-            temp: 90,
-            instFuel: 0.0,
-            iat: 24,
-            maf: 3.5,
-            stft: 0,
+            rpm: 900,
+            temp: 95,
+            instFuel: 4.0,
+            iat: 38,
+            maf: 8.5,
+            stft: 5,
             timing: 8,
-            throttle: 5,
-            note: "Tiba di Situ Gunung",
+            throttle: 8,
+            note: "Macet Merayap",
+          },
+          {
+            time: "17:00",
+            latitude: -6.918,
+            longitude: 106.915,
+            speed: 0,
+            rpm: 800,
+            temp: 98,
+            instFuel: 0.0,
+            iat: 40,
+            maf: 4.0,
+            stft: 6,
+            timing: 5,
+            throttle: 0,
+            note: "Idle Parah (Lampu Merah)",
+          },
+          {
+            time: "17:15",
+            latitude: -6.915,
+            longitude: 106.91,
+            speed: 25,
+            rpm: 1800,
+            temp: 94,
+            instFuel: 9.0,
+            iat: 36,
+            maf: 15.0,
+            stft: 2,
+            timing: 18,
+            throttle: 18,
+            note: "Mulai Jalan Sedikit",
+          },
+          {
+            time: "17:30",
+            latitude: -6.91,
+            longitude: 106.9,
+            speed: 35,
+            rpm: 2200,
+            temp: 92,
+            instFuel: 12.0,
+            iat: 34,
+            maf: 18.0,
+            stft: 0,
+            timing: 22,
+            throttle: 20,
+            note: "Tiba di Tujuan",
           },
         ],
       },
     ];
 
     try {
-      await AsyncStorage.setItem("@livina_trips", JSON.stringify(dummyTrips));
+      const db = getDB();
+
+      // Looping untuk memasukkan data ke SQLite
+      dummyTrips.forEach((trip) => {
+        // 1. Simpan Header ke tabel `trips`
+        const tripStmt = db.prepareSync(
+          `INSERT INTO trips (id, date, route, distance, time, fuel, ecoScore, topSpeed, maxRpm, cost, peakAlt, climb) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        );
+        tripStmt.executeSync([
+          trip.id,
+          trip.date,
+          trip.route,
+          trip.distance,
+          trip.time,
+          trip.details.fuelUsed,
+          trip.ecoScore,
+          trip.details.topSpeed,
+          trip.details.maxRpm,
+          trip.details.cost,
+          trip.details.peakAlt,
+          trip.details.climb,
+        ]);
+
+        // 2. Simpan Koordinat ke tabel `trip_points`
+        const pointStmt = db.prepareSync(
+          `INSERT INTO trip_points (trip_id, time, latitude, longitude, speed, rpm, temp, instFuel, iat, maf, stft, timing, throttle, note, altitude, ltft, volt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 13.8)`,
+        );
+        trip.routeData.forEach((point) => {
+          pointStmt.executeSync([
+            trip.id,
+            point.time,
+            point.latitude,
+            point.longitude,
+            point.speed,
+            point.rpm,
+            point.temp,
+            point.instFuel,
+            point.iat,
+            point.maf,
+            point.stft,
+            point.timing,
+            point.throttle,
+            point.note,
+          ]);
+        });
+      });
+
       showAlert(
         "SUKSES",
-        "Data Jalur Cikidang & Situ Gunung berhasil disuntikkan!",
+        "Data Dummy (Tol Bocimi & Macet Kota) berhasil disuntikkan ke Database SQLite!",
         "success",
       );
-      syncTrips();
+
+      syncTrips(); // Panggil ulang untuk merefresh daftar di layar
     } catch (error) {
-      console.error(error);
+      console.error("Error Inject Dummy:", error);
+      showAlert(
+        "ERROR DB",
+        "Gagal menyuntikkan data dummy ke database.",
+        "error",
+      );
     }
   };
 
@@ -624,17 +543,6 @@ export default function TripScreen() {
             <Text style={{ color: "#fff", fontSize: 10 }}>Inject Dummy</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={recoverOrphanTrip}
-            style={{
-              marginLeft: 8,
-              backgroundColor: "#c0392b",
-              padding: 5,
-              borderRadius: 5,
-            }}
-          >
-            <Text style={{ color: "#fff", fontSize: 10 }}>🚨 Recover</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
             onPress={nukeStorage}
             style={{
               marginLeft: 8,
@@ -700,7 +608,10 @@ export default function TripScreen() {
               key={trip.id}
               style={styles.tripCard}
               activeOpacity={0.7}
-              onPress={() => setSelectedTrip(trip)}
+              onPress={() => {
+                const points = getTripPoints(trip.id);
+                setSelectedTrip({ ...trip, routeData: points });
+              }}
             >
               <View style={styles.tripHeader}>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -806,7 +717,7 @@ export default function TripScreen() {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    onPress={() => exportToCSV(selectedTrip)}
+                    onPress={() => downloadToDevice(selectedTrip)}
                     style={styles.closeBtn}
                   >
                     <Ionicons
@@ -1024,7 +935,7 @@ export default function TripScreen() {
                 <View style={styles.detailBox}>
                   <Text style={styles.detailLabel}>TOP SPEED</Text>
                   <Text style={styles.detailValue}>
-                    {selectedTrip.details?.topSpeed || 0} km/h
+                    {selectedTrip.details?.topSpeed || 0}
                   </Text>
                 </View>
                 <View style={styles.detailBox}>

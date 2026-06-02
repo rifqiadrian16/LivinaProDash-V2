@@ -303,21 +303,53 @@ export default function useBLE(
     }, 15000);
   };
 
-  // Kirim pesan ke ESP32
-  const sendMessage = async (message: string) => {
-    if (connectedDevice) {
-      try {
-        const base64Msg = Buffer.from(message).toString("base64");
-        await connectedDevice.writeCharacteristicWithResponseForService(
-          "4fafc201-1fb5-459e-8fcc-c5c9c331914b",
-          "8c38148b-3db4-46c6-bb50-51b68181fb6b",
-          base64Msg,
-        );
-        console.log("Terkirim ke ESP32:", message);
-      } catch (err) {
-        console.log("[BLE] Gagal kirim:", err);
+  const messageQueue = useRef<string[]>([]);
+  const isProcessingQueue = useRef(false);
+
+  // Fungsi internal untuk memproses antrean satu per satu
+  const processQueue = async () => {
+    // Kalau sedang memproses pesan lain atau antrean kosong, diam saja
+    if (isProcessingQueue.current || messageQueue.current.length === 0) return;
+
+    isProcessingQueue.current = true;
+
+    while (messageQueue.current.length > 0) {
+      const msg = messageQueue.current[0]; // Ambil pesan antrean terdepan
+
+      if (connectedDevice) {
+        try {
+          const base64Msg = Buffer.from(msg).toString("base64");
+
+          // 1. TUNGGU HARDWARE ACK: Fungsi ini akan pause (await) sampai ESP32
+          //    mengonfirmasi bahwa dia sudah menerima paket Bluetooth-nya!
+          await connectedDevice.writeCharacteristicWithResponseForService(
+            "4fafc201-1fb5-459e-8fcc-c5c9c331914b",
+            "8c38148b-3db4-46c6-bb50-51b68181fb6b",
+            base64Msg,
+          );
+          console.log("[BLE Queue] Terkirim & Di-ACK ESP32:", msg);
+
+          // 2. SAFETY PADDING: Jeda 200ms ekstra agar chip ESP32 sempat
+          //    memproses String tersebut di dalam loop C++ / Arduino-nya.
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        } catch (err) {
+          console.log("[BLE Queue] Gagal kirim pesan:", msg, err);
+        }
       }
+
+      // 3. Setelah beres dikirim (atau gagal), tendang pesan dari antrean
+      messageQueue.current.shift();
     }
+
+    // Bebaskan mesin antrean
+    isProcessingQueue.current = false;
+  };
+
+  // Fungsi public yang dipakai oleh useDashboard
+  const sendMessage = (message: string) => {
+    // Jangan langsung dikirim, tapi masukkan ke antrean dulu!
+    messageQueue.current.push(message);
+    processQueue();
   };
 
   return {
