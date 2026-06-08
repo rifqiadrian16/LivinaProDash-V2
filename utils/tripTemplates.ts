@@ -94,6 +94,14 @@ export const getShareCardHtml = (trip: any, theme: "solid" | "transparent") => {
   const fadeBg = isSolid ? "linear-gradient(transparent,#111)" : "transparent";
   const brandBg = isSolid ? "rgba(0,0,0,0.6)" : "transparent";
 
+  const labelColor = isSolid
+    ? "rgba(255,255,255,0.4)"
+    : "rgba(255,255,255,0.85)";
+  const subTextColor = isSolid
+    ? "rgba(255,255,255,0.3)"
+    : "rgba(255,255,255,0.75)";
+  const textShadow = isSolid ? "none" : "0px 1px 4px rgba(0,0,0,0.8)";
+
   // Basemap Satelit (Hanya di-load kalau temanya solid)
   const tileUrl = isSolid
     ? "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
@@ -126,18 +134,18 @@ body { background:transparent; overflow:hidden; width:270px; }
 
 /* Efek gradien dimatikan jika transparan */
 .fade-btm { position:absolute; bottom:0; left:0; width:270px; height:70px; z-index:998; background:${fadeBg}; pointer-events:none; }
-.body { padding:16px 18px 18px; background:${bgColor}; }
+.body { padding:16px 18px 18px; background:${bgColor}; text-shadow: ${textShadow}; }
 
-.car-name { font-size:26px; font-weight:900; font-style:italic; color:#fff; margin-bottom:3px; letter-spacing:-0.5px; }
-.trip-date { font-size:10px; color:rgba(255,255,255,0.45); margin-bottom:12px; letter-spacing:0.5px; text-transform:uppercase; }
-.accent { width:24px; height:2.5px; background:${accentColor}; border-radius:2px; margin-bottom:16px; }
-.stats { display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; }
-.stat-label { font-size:9px; color:rgba(255,255,255,0.4); letter-spacing:1px; margin-bottom:2px; text-transform:uppercase; }
+.car-name { font-size:26px; font-weight:100; font-style:italic; color:#fff; margin-bottom:3px; letter-spacing:0.5px; margin-left: 15px;}
+.trip-date { font-size:10px; color:${labelColor}; margin-bottom:12px; letter-spacing:0.5px; text-transform:uppercase; margin-left: 15px; }
+.accent { width:24px; height:2.5px; background:${accentColor}; border-radius:2px; margin-bottom:16px; margin-left: 15px;}
+.stats { display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; margin-left: 15px; }
+.stat-label { font-size:9px; color:${labelColor}; letter-spacing:1px; margin-bottom:2px; text-transform:uppercase; }
 .stat-val { font-size:24px; font-weight:700; color:#fff; line-height:1; letter-spacing:-0.5px; }
 .unit { font-size:12px; font-weight:700; color:${accentColor}; margin-left:1px; }
-.footer { margin-top:16px; padding-top:12px; border-top:0.5px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center; }
-.footer-brand { font-size:9px; font-weight:700; letter-spacing:2px; color:rgba(255,255,255,0.4); text-transform:uppercase; }
-.footer-via { font-size:9px; color:rgba(255,255,255,0.3); }
+.footer { margin-top:16px; padding-top:12px; border-top:0.5px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center; margin-right:15px; margin-left: 15px }
+.footer-brand { font-size:9px; font-weight:700; letter-spacing:2px; color:${labelColor}; text-transform:uppercase;}
+.footer-via { font-size:9px; color:${subTextColor};}
 </style>
 </head>
 <body>
@@ -189,7 +197,7 @@ if (coords.length > 0) {
   var bounds = L.latLngBounds(coords);
   
   // 2. Gunakan padding 15 agar rute punya bingkai pelindung dan tak akan pernah kepotong
-  map.fitBounds(bounds, { padding: [45, 45], animate: false, maxZoom: 16});
+  map.fitBounds(bounds, { padding: [20, 20], animate: false, maxZoom: 19 });
 
   // Layer Glow (Shadow)
   L.polyline(coords, { color: '${accentColor}', weight: 6, opacity: 0.2, lineCap: 'round', lineJoin: 'round' }).addTo(map);
@@ -197,14 +205,31 @@ if (coords.length > 0) {
   // Layer Inti (Solid)
   L.polyline(coords, { color: '${accentColor}', weight: 2.5, lineCap: 'round', lineJoin: 'round' }).addTo(map);
 
-  function dot(bg, border) {
+  function createModernMarker(type, bgColor) {
+    // Tentukan bentuk di dalam lingkaran (bulat untuk start, kotak untuk finish)
+    var innerShape = type === 'start' 
+      ? '<div style="width: 6px; height: 6px; background-color: #ffffff; border-radius: 50%;"></div>' // Titik bulat
+      : '<div style="width: 6px; height: 6px; background-color: #ffffff; border-radius: 1px;"></div>'; // Kotak stop
+
     return L.divIcon({
-      html: '<div style="width:10px;height:10px;border-radius:50%;background:' + bg + ';border:2.5px solid ' + border + ';box-sizing:border-box;"></div>',
-      className: '', iconSize: [10, 10], iconAnchor: [5, 5]
+      html: '<div style="width: 18px; height: 18px; background-color: ' + bgColor + '; border-radius: 50%; border: 2.5px solid #ffffff; box-shadow: 0 3px 6px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; position: absolute; left: 0; top: 0; transform: translate(-50%, -50%);">' + innerShape + '</div>',
+      className: '', 
+      iconSize: [0, 0], 
+      iconAnchor: [0, 0] 
     });
   }
-  L.marker(coords[0], { icon: dot('#fff', '#ccc') }).addTo(map);
-  L.marker(coords[coords.length - 1], { icon: dot('${accentColor}', '#fff') }).addTo(map);
+  
+  // Pasang Titik START (Hijau Terang)
+  L.marker(coords[0], { 
+    icon: createModernMarker('start', '#FC4C02'), 
+    zIndexOffset: 1000 
+  }).addTo(map);
+  
+  // Pasang Titik FINISH (Merah Terang)
+  L.marker(coords[coords.length - 1], { 
+    icon: createModernMarker('finish', '#3b3333'), 
+    zIndexOffset: 2000 
+  }).addTo(map);
 }
 
 // Tunggu map benar-benar selesai render lalu signal RN

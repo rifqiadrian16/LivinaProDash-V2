@@ -61,7 +61,7 @@ export default function ShareModal({
       }
 
       // Delay ekstra agar WebView benar-benar selesai paint setelah signal
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       if (shareCardRef.current?.capture) {
         const uri = await shareCardRef.current.capture();
@@ -164,6 +164,7 @@ export default function ShareModal({
               scrollEnabled={false}
               bounces={false}
               originWhitelist={["*"]}
+              androidLayerType="software"
               onMessage={(e) => {
                 if (e.nativeEvent.data === "MAP_READY") {
                   setIsMapReady(true);
