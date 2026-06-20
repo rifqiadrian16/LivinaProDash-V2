@@ -192,15 +192,14 @@ export default function useDashboard() {
       const savedPin = await AsyncStorage.getItem("@obd_pin");
       const savedOtaSsid = await AsyncStorage.getItem("@ota_ssid");
       const savedOtaPass = await AsyncStorage.getItem("@ota_pass");
-      const orphanBuffer = await AsyncStorage.getItem("@livina_trip_buffer");
       const orphanStats = await AsyncStorage.getItem("@livina_running_stats");
 
-      if (orphanBuffer && orphanStats) {
+      if (orphanStats) {
         try {
           const stats = JSON.parse(orphanStats);
-          const buffer = JSON.parse(orphanBuffer);
 
-          if (Array.isArray(buffer) && buffer.length > 5 && stats.tripId) {
+          if (stats.tripId) {
+            // 1. Set ulang State sementara (seolah-olah kita masih jalan)
             currentTripId.current = stats.tripId;
             runningStats.current = {
               distance: stats.distance || 0,
@@ -208,19 +207,20 @@ export default function useDashboard() {
               startTime: stats.startTime || Date.now(),
             };
 
+            // 2. Panggil fungsi saveTripData agar data dikunci ke SQLite
             const autoName = `Auto-Save (Recovery ${new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })})`;
-            await saveTripData(autoName);
+            saveTripData(autoName);
+
+            // 3. Bersihkan sampah agar tidak looping recovery terus menerus
             await AsyncStorage.removeItem("@livina_running_stats");
 
             showAlert(
               "Trip Dipulihkan",
-              "Data perjalanan sebelumnya berhasil diselamatkan!",
+              "Aplikasi sempat terhenti. Data perjalanan berhasil diselamatkan dari SQLite!",
               "success",
             );
           }
         } catch (e) {
-          await AsyncStorage.removeItem("@livina_trip_buffer");
-          await AsyncStorage.removeItem("@livina_trip_buffer_bak");
           await AsyncStorage.removeItem("@livina_running_stats");
         }
       }
@@ -373,10 +373,10 @@ export default function useDashboard() {
     }
   };
 
-  const confirmSaveTrip = (tripName: string) => {
+  const confirmSaveTrip = (tripName: string, fuelPrice: number) => {
     setShowSaveTripModal(false);
     AsyncStorage.removeItem("@livina_running_stats");
-    saveTripData(tripName);
+    saveTripData(tripName, fuelPrice);
   };
 
   const discardTrip = () => {
@@ -456,6 +456,17 @@ export default function useDashboard() {
     if (isDFCO) fuelFlow = 0;
     // ===============================================================
 
+    if (dt > 0 && dt < 0.003) {
+      // 1. Akumulasi jarak dan bensin selama ECU terkoneksi
+      sessionStats.current.distance += newData.s * dt;
+      sessionStats.current.fuel += fuelFlow * dt;
+
+      // 2. Kalkulasi rata-rata (Jarak / Bensin) dan update ke layar
+      if (sessionStats.current.fuel > 0) {
+        setAvgFuel(sessionStats.current.distance / sessionStats.current.fuel);
+      }
+    }
+
     if (isRecordingRef.current) {
       if (dt > 0 && dt < 0.003) {
         runningStats.current.distance += newData.s * dt;
@@ -483,33 +494,38 @@ export default function useDashboard() {
           recInst = Math.min(newData.s / fuelFlow, 99.9);
 
         // Langsung Tembak Baris Baru ke SQLite! (0% RAM)
-        insertTripPoint(currentTripId.current, {
-          latitude: latestLocation.current?.latitude || 0,
-          longitude: latestLocation.current?.longitude || 0,
-          altitude: latestLocation.current?.altitude || 0,
-          speed: newData.s,
-          rpm: newData.r,
-          temp: newData.t,
-          iat: newData.i,
-          maf: newData.m,
-          stft: newData.st,
-          ltft: newData.lt,
-          timing: newData.tm,
-          volt: newData.v,
-          throttle: newData.th,
-          instFuel: recInst.toFixed(1),
-          time: new Date().toLocaleTimeString("id-ID", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          note: isDFCO
-            ? "Engine Brake (0%)"
-            : newData.s > 80
-              ? "High Speed"
-              : newData.r > 3500
-                ? "Aggressive"
-                : "Cruising",
-        });
+        try {
+          insertTripPoint(currentTripId.current, {
+            latitude: latestLocation.current?.latitude || 0,
+            longitude: latestLocation.current?.longitude || 0,
+            altitude: latestLocation.current?.altitude || 0,
+            speed: newData.s,
+            rpm: newData.r,
+            temp: newData.t,
+            iat: newData.i,
+            maf: newData.m,
+            stft: newData.st,
+            ltft: newData.lt,
+            timing: newData.tm,
+            volt: newData.v,
+            throttle: newData.th,
+            instFuel: recInst.toFixed(1),
+            time: new Date().toLocaleTimeString("id-ID", {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            note: isDFCO
+              ? "Engine Brake (0%)"
+              : newData.s > 80
+                ? "High Speed"
+                : newData.r > 3500
+                  ? "Aggressive"
+                  : "Cruising",
+          });
+        } catch (dbError) {
+          console.warn("Gagal simpan titik, mungkin storage penuh:", dbError);
+          // Aplikasi tidak akan crash, hanya melewati 1 frame data ini
+        }
       }
     }
   };

@@ -171,9 +171,6 @@ export default function TripScreen() {
     setIsSyncing(true);
     try {
       const db = getDB();
-      // AUTO-HEAL: Bersihkan "Ghost Trip" kalau kemarin sempat Force Close
-      db.execSync(`DELETE FROM trips WHERE route = 'Merekam...'`);
-
       // Sedot data header trip dari SQLite
       const savedTrips = db.getAllSync("SELECT * FROM trips ORDER BY id DESC");
 
@@ -200,17 +197,6 @@ export default function TripScreen() {
       );
     } finally {
       setTimeout(() => setIsSyncing(false), 500);
-    }
-  };
-
-  const nukeStorage = () => {
-    try {
-      const db = getDB();
-      db.execSync("DELETE FROM trips"); // Ini otomatis hapus tabel trip_points juga
-      setTripHistory([]);
-      showAlert("BERSIH", "Database SQLite direset total!", "success");
-    } catch (error) {
-      showAlert("GAGAL", "Gagal mereset database.", "error");
     }
   };
 
@@ -542,17 +528,6 @@ export default function TripScreen() {
           >
             <Text style={{ color: "#fff", fontSize: 10 }}>Inject Dummy</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={nukeStorage}
-            style={{
-              marginLeft: 8,
-              backgroundColor: "#555",
-              padding: 5,
-              borderRadius: 5,
-            }}
-          >
-            <Text style={{ color: "#fff", fontSize: 10 }}>Nuke</Text>
-          </TouchableOpacity>
         </View>
 
         <View style={{ flexDirection: "row", gap: 12 }}>
@@ -602,7 +577,10 @@ export default function TripScreen() {
           </Text>
         </View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 120 }}
+        >
           {tripHistory.map((trip) => (
             <TouchableOpacity
               key={trip.id}
