@@ -3,7 +3,7 @@
     "name": "LivinaProDash",
     "slug": "LivinaProDash",
     "version": "2.7.5",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/livina.png",
     "scheme": "livinaprodash",
     "userInterfaceStyle": "automatic",

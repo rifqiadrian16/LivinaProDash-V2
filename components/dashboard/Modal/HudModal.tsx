@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Modal, Text, TouchableOpacity, View } from "react-native";
 import { styles } from "../../../styles/dashboard.styles";
@@ -15,6 +16,8 @@ export default function HudModal({
   transmission,
   instFuel,
   avgFuel,
+  mirrorEnabled = true,
+  onToggleMirror,
 }: any) {
   // ================= PANGGIL JALUR NINJA DI SINI =================
   // Kita suapkan data RPM (data.r) dan Speed (data.s) dari sensor HUD
@@ -61,10 +64,65 @@ export default function HudModal({
           </View>
         )}
 
+        {/* TOMBOL CEPAT: TOGGLE FLIP MIRROR */}
+        {onToggleMirror && (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={(e) => {
+              // Cegah event tap ini ikut kehitung sebagai "ketuk keluar HUD"
+              e.stopPropagation();
+              onToggleMirror();
+            }}
+            style={{
+              position: "absolute",
+              bottom: 10,
+              // Posisi kanan-atas secara visual tetap konsisten baik saat
+              // konten mirror maupun normal, karena tombol ini di luar
+              // kontainer yang di-scaleX(-1).
+              right: "50%",
+              zIndex: 100,
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: "rgba(255,255,255,0.08)",
+              paddingHorizontal: 12,
+              paddingVertical: 7,
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.2)",
+              gap: 6,
+            }}
+          >
+            <Ionicons
+              name="repeat-outline"
+              size={14}
+              color={mirrorEnabled ? "#00ffcc" : "rgba(255,255,255,0.5)"}
+            />
+            <Text
+              style={{
+                color: mirrorEnabled ? "#00ffcc" : "rgba(255,255,255,0.5)",
+                fontSize: 10,
+                fontWeight: "bold",
+                letterSpacing: 1,
+              }}
+            >
+              {mirrorEnabled ? "MIRROR" : "NORMAL"}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {/* =====================================================
         KONTAINER CERMIN (MIRRORING)
+        - Mirror ON  -> dipakai untuk reflektor kaca depan (HUD projector),
+                        teks dibalik agar terbaca normal saat dipantulkan kaca.
+        - Mirror OFF -> dipakai untuk head unit / tampilan layar langsung,
+                        teks tampil normal tanpa pembalikan.
         ===================================================== */}
-        <View style={{ transform: [{ scaleX: -1 }], width: "92%" }}>
+        <View
+          style={{
+            transform: [{ scaleX: mirrorEnabled ? -1 : 1 }],
+            width: "92%",
+          }}
+        >
           {/* -------------------------------------------------
           BAGIAN ATAS: RPM BAR TEGAS (MONOKROM + REDLINE)
           ------------------------------------------------- */}

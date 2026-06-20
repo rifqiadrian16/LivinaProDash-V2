@@ -42,6 +42,10 @@ export default function useDashboard() {
   const [hudTapCount, setHudTapCount] = useState(0);
   const hudTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ✅ FLIP MIRROR HUD: default TRUE (perilaku lama / reflektor kaca tetap jalan)
+  // Simpan preferensi user supaya tidak perlu di-set ulang setiap buka app.
+  const [hudMirrorEnabled, setHudMirrorEnabled] = useState(true);
+
   const [data, setData] = useState({
     s: 0,
     r: 0,
@@ -193,6 +197,10 @@ export default function useDashboard() {
       const savedOtaSsid = await AsyncStorage.getItem("@ota_ssid");
       const savedOtaPass = await AsyncStorage.getItem("@ota_pass");
       const orphanStats = await AsyncStorage.getItem("@livina_running_stats");
+
+      // ✅ Muat preferensi Flip Mirror HUD (default tetap true bila belum pernah diset)
+      const savedHudMirror = await AsyncStorage.getItem("@hud_mirror");
+      if (savedHudMirror !== null) setHudMirrorEnabled(savedHudMirror === "1");
 
       if (orphanStats) {
         try {
@@ -812,6 +820,13 @@ export default function useDashboard() {
     });
   };
 
+  // ✅ TOGGLE FLIP MIRROR HUD (dipakai oleh tombol cepat di HUD & Settings)
+  const toggleHudMirror = async () => {
+    const next = !hudMirrorEnabled;
+    setHudMirrorEnabled(next);
+    await AsyncStorage.setItem("@hud_mirror", next ? "1" : "0");
+  };
+
   let targetAFR = 14.7;
   if (data.th > 50) targetAFR = 12.0;
   else if (data.th > 30) targetAFR = 13.5;
@@ -884,6 +899,7 @@ export default function useDashboard() {
       showTerminal,
       terminalLogs,
       showSaveTripModal,
+      hudMirrorEnabled,
     },
     actions: {
       setOtaSsid,
@@ -922,6 +938,7 @@ export default function useDashboard() {
       closeTerminal,
       confirmSaveTrip,
       discardTrip,
+      toggleHudMirror,
     },
   };
 }

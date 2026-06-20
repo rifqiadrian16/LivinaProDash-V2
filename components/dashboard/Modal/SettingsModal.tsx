@@ -40,6 +40,8 @@ export default function SettingsModal({
   scannedDevices,
   onSelectDevice,
   sendMessage,
+  hudMirrorEnabled,
+  onToggleHudMirror,
 }: any) {
   const [secretTapCount, setSecretTapCount] = useState(0);
   const keyboardOffset = useRef(new Animated.Value(0)).current;
@@ -322,6 +324,54 @@ export default function SettingsModal({
                     </View>
                   </View>
                 )}
+              </View>
+
+              {/* ✅ MODE TAMPILAN HUD (FLIP MIRROR) */}
+              <View
+                style={{
+                  borderTopWidth: 1,
+                  borderTopColor: "#222",
+                  paddingTop: 20,
+                  marginBottom: 20,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <View style={{ flex: 1, marginRight: 10 }}>
+                    <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                      Mode Tampilan HUD
+                    </Text>
+                    <Text style={{ color: "#666", fontSize: 10 }}>
+                      {hudMirrorEnabled
+                        ? "Mirror: untuk dipantulkan di kaca depan (reflektor)"
+                        : "Normal: untuk head unit / layar langsung"}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={onToggleHudMirror}
+                    style={{
+                      backgroundColor: hudMirrorEnabled ? "#00ffcc" : "#333",
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 20,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: hudMirrorEnabled ? "#000" : "#fff",
+                        fontSize: 10,
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {hudMirrorEnabled ? "MIRROR" : "NORMAL"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               <TouchableOpacity style={styles.saveBtn} onPress={onApply}>

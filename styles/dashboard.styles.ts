@@ -295,6 +295,7 @@ export const styles = StyleSheet.create({
     fontWeight: "bold",
     letterSpacing: 2,
     marginBottom: 2,
+    marginRight: 5,
   },
   hudValueBig: {
     color: "rgba(255,255,255,0.9)",

@@ -6,6 +6,7 @@ import {
   ScrollView,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -31,10 +32,70 @@ import { styles } from "../../styles/dashboard.styles";
 
 export default function DashboardScreen() {
   const { state, actions } = useDashboard();
+
+  // ✅ DETEKSI ORIENTASI OTOMATIS (tanpa lock manual)
+  // Di HP biasa: portrait -> width < height -> layout vertikal (lama).
+  // Di head unit (layar lebar permanen) atau HP yang diputar manual:
+  // width > height -> layout landscape 2-kolom (gauge kiri, data kanan).
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
+
   // 🛡️ GERBANG LOGIKA TAMPILAN DINAMIS
   const renderMainContent = () => {
     // KONDISI UTAMA: Tampilkan Dashboard Aktif
     if (state.isBypassed || state.obdStatus === "ready") {
+      // ====================================================
+      // LAYOUT LANDSCAPE (HEAD UNIT / HP DIPUTAR)
+      // Gauge besar di kiri (fixed), data grid scrollable di kanan.
+      // ====================================================
+      if (isLandscape) {
+        return (
+          <View style={{ flex: 1, flexDirection: "row" }}>
+            {/* KOLOM KIRI: HEADER + GAUGE UTAMA (TIDAK SCROLL) */}
+            <View
+              style={{
+                flex: 1,
+                paddingHorizontal: 16,
+                paddingTop: 12,
+                justifyContent: "center",
+              }}
+            >
+              <DashboardHeader
+                isConnected={state.isConnected}
+                isNightTime={state.isNightTime}
+                onEnterHud={actions.enterHudMode}
+                onOpenSettings={() => actions.setShowSettings(true)}
+                onDisconnect={actions.disconnectOBD}
+                isObdStandby={state.isObdStandby}
+                onOpenTerminal={() => actions.setShowTerminal(true)}
+              />
+              <MainGauges
+                rpm={state.data.r}
+                speed={state.data.s}
+                transmission={state.transmission || "matic"}
+              />
+            </View>
+
+            {/* KOLOM KANAN: DATA GRID (SCROLLABLE, 2 KOLOM SENSOR) */}
+            <ScrollView
+              style={{ flex: 1, paddingHorizontal: 16 }}
+              contentContainerStyle={{ paddingTop: 12, paddingBottom: 30 }}
+              showsVerticalScrollIndicator={false}
+            >
+              <DataGrid
+                data={state.data}
+                instFuel={state.instFuel}
+                avgFuel={state.avgFuel}
+                compact
+              />
+            </ScrollView>
+          </View>
+        );
+      }
+
+      // ====================================================
+      // LAYOUT PORTRAIT (DEFAULT / HP TEGAK) — TETAP SEPERTI SEMULA
+      // ====================================================
       return (
         <ScrollView
           style={styles.container}
@@ -215,6 +276,8 @@ export default function DashboardScreen() {
         isSearchingOBD={state.isSearchingOBD}
         scannedDevices={state.scannedDevices}
         onSelectDevice={actions.selectDevice}
+        hudMirrorEnabled={state.hudMirrorEnabled}
+        onToggleHudMirror={actions.toggleHudMirror}
       />
       <HudModal
         visible={state.isHudMode}
@@ -225,6 +288,8 @@ export default function DashboardScreen() {
         transmission={state.transmission}
         instFuel={state.instFuel}
         avgFuel={state.avgFuel}
+        mirrorEnabled={state.hudMirrorEnabled}
+        onToggleMirror={actions.toggleHudMirror}
       />
 
       <SaveTripModal
