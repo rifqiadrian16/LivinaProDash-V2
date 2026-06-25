@@ -9,13 +9,17 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import useDashboard from "../../hooks/useDashboard";
 
 // IMPORT SUB-SCREENS
 import ConnectingEcuScreen from "../../components/dashboard/ConnectingEcuScreen";
 import DashboardHeader from "../../components/dashboard/DashboardHeader";
 import DataGrid from "../../components/dashboard/DataGrid";
+import LandscapeGauges from "../../components/dashboard/LandScapeGauges";
 import MainGauges from "../../components/dashboard/MainGauges";
 import WaitingMacScreen from "../../components/dashboard/WaitingMacScreen";
 
@@ -34,11 +38,12 @@ export default function DashboardScreen() {
   const { state, actions } = useDashboard();
 
   // ✅ DETEKSI ORIENTASI OTOMATIS (tanpa lock manual)
-  // Di HP biasa: portrait -> width < height -> layout vertikal (lama).
+  // Di HP biasa: portrait -> width < height -> layout vertikal (lama, MainGauges).
   // Di head unit (layar lebar permanen) atau HP yang diputar manual:
-  // width > height -> layout landscape 2-kolom (gauge kiri, data kanan).
+  // width > height -> layout landscape 2-kolom (LandscapeGauges: RPM & Speed terpisah).
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
+  const insets = useSafeAreaInsets();
 
   // 🛡️ GERBANG LOGIKA TAMPILAN DINAMIS
   const renderMainContent = () => {
@@ -46,20 +51,17 @@ export default function DashboardScreen() {
     if (state.isBypassed || state.obdStatus === "ready") {
       // ====================================================
       // LAYOUT LANDSCAPE (HEAD UNIT / HP DIPUTAR)
-      // Gauge besar di kiri (fixed), data grid scrollable di kanan.
+      // ⚠️ DIROMBAK TOTAL: pakai LandscapeGauges (2 gauge bundar
+      // terpisah, RPM hijau + Speed biru dengan ring progress &
+      // needle) — BUKAN MainGauges. MainGauges (portrait) tetap
+      // tidak disentuh sama sekali.
       // ====================================================
       if (isLandscape) {
         return (
-          <View style={{ flex: 1, flexDirection: "row" }}>
-            {/* KOLOM KIRI: HEADER + GAUGE UTAMA (TIDAK SCROLL) */}
-            <View
-              style={{
-                flex: 1,
-                paddingHorizontal: 16,
-                paddingTop: 12,
-                justifyContent: "center",
-              }}
-            >
+          // BUNGKUSAN UTAMA: Mengatur urutan dari Atas ke Bawah
+          <View style={{ flex: 1, paddingTop: 8 }}>
+            {/* 1. HEADER AREA (FULL WIDTH) */}
+            <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
               <DashboardHeader
                 isConnected={state.isConnected}
                 isNightTime={state.isNightTime}
@@ -69,37 +71,63 @@ export default function DashboardScreen() {
                 isObdStandby={state.isObdStandby}
                 onOpenTerminal={() => actions.setShowTerminal(true)}
               />
-              <MainGauges
-                rpm={state.data.r}
-                speed={state.data.s}
-                transmission={state.transmission || "matic"}
-              />
             </View>
 
-            {/* KOLOM KANAN: DATA GRID (SCROLLABLE, 2 KOLOM SENSOR) */}
-            <ScrollView
-              style={{ flex: 1, paddingHorizontal: 16 }}
-              contentContainerStyle={{ paddingTop: 12, paddingBottom: 30 }}
-              showsVerticalScrollIndicator={false}
+            {/* 2. KONTEN TENGAH (DIBAGI 50:50 KIRI & KANAN) */}
+            <View
+              style={{
+                flex: 1,
+                flexDirection: "row",
+                // Beri jarak di bawah agar tidak tertutup Tab Bar melayang (Tab Bar = ~64px)
+                paddingBottom: 85,
+              }}
             >
-              <DataGrid
-                data={state.data}
-                instFuel={state.instFuel}
-                avgFuel={state.avgFuel}
-                compact
-              />
-            </ScrollView>
+              {/* KOLOM KIRI (50%): GAUGE AREA */}
+              <View
+                style={{
+                  flex: 1,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  paddingHorizontal: 8,
+                }}
+              >
+                <LandscapeGauges
+                  rpm={state.data.r}
+                  speed={state.data.s}
+                  transmission={state.transmission || "matic"}
+                />
+              </View>
+
+              {/* KOLOM KANAN (50%): DATA GRID */}
+              <View
+                style={{
+                  flex: 1,
+                  paddingHorizontal: 8,
+                  // GANTI "center" MENJADI "space-between" atau "space-evenly"
+                  justifyContent: "center",
+                  paddingTop: 4, // Beri jarak napas sedikit di atas
+                }}
+              >
+                <DataGrid
+                  data={state.data}
+                  instFuel={state.instFuel}
+                  avgFuel={state.avgFuel}
+                  compact
+                />
+              </View>
+            </View>
           </View>
         );
       }
 
       // ====================================================
       // LAYOUT PORTRAIT (DEFAULT / HP TEGAK) — TETAP SEPERTI SEMULA
+      // MainGauges (gauge gabungan RPM+Speed lama) TIDAK DIUBAH.
       // ====================================================
       return (
         <ScrollView
           style={styles.container}
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={{ paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
         >
           <DashboardHeader
@@ -176,7 +204,17 @@ export default function DashboardScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView
+      style={[
+        styles.safeArea,
+        {
+          // Paksa padding kiri dan kanan sama besar mengikuti ukuran notch/kamera
+          paddingLeft: Math.max(insets.left, insets.right),
+          paddingRight: Math.max(insets.left, insets.right),
+        },
+      ]}
+      edges={["top", "bottom"]} // Abaikan safe area kiri/kanan bawaan
+    >
       {/* 🚀 Render Konten Dinamis */}
       {renderMainContent()}
 
@@ -303,6 +341,7 @@ export default function DashboardScreen() {
         onClose={actions.closeTerminal}
         logs={state.terminalLogs}
         onSend={actions.sendToTerminal}
+        onSendRaw={actions.sendMessage}
       />
     </SafeAreaView>
   );

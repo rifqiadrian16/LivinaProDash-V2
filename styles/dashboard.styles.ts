@@ -191,7 +191,7 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    gap: 10,
+    gap: 5,
   },
   card: {
     width: "31%",

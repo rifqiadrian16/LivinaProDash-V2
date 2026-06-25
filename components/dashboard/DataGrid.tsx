@@ -3,26 +3,40 @@ import { Text, View } from "react-native";
 import { styles } from "../../styles/dashboard.styles";
 import SensorCard from "./SensorCard";
 
-// ✅ Tambahan: prop `compact` untuk grid 2-kolom di mode landscape (head unit)
-// Saat compact=true, grid sensor jadi 2 kolom (bukan 3) agar lebih lega
-// di area sempit sebelah gauge, dan fuel row ditata lebih ringkas.
 const DataGrid = memo(({ data, instFuel, avgFuel, compact = false }: any) => {
   return (
     <>
-      <View style={[styles.fuelRow, compact && { marginBottom: 10 }]}>
+      {/* KOTAK FUEL DIPERAS */}
+      <View
+        style={[
+          styles.fuelRow,
+          compact && { marginBottom: 16, paddingVertical: 12 },
+        ]}
+      >
         <View style={styles.fuelItem}>
-          <Text style={styles.fuelLabel}>INST. FUEL</Text>
-          <Text style={styles.fuelValue}>
-            {instFuel.toFixed(1)} <Text style={styles.unitSmall}>km/L</Text>
+          <Text style={[styles.fuelLabel, compact && { fontSize: 9 }]}>
+            INST. FUEL
+          </Text>
+          <Text style={[styles.fuelValue, compact && { fontSize: 16 }]}>
+            {instFuel.toFixed(1)}{" "}
+            <Text style={[styles.unitSmall, compact && { fontSize: 10 }]}>
+              km/L
+            </Text>
           </Text>
         </View>
         <View style={styles.fuelItem}>
-          <Text style={styles.fuelLabel}>AVG. FUEL</Text>
-          <Text style={styles.fuelValue}>
-            {avgFuel.toFixed(1)} <Text style={styles.unitSmall}>km/L</Text>
+          <Text style={[styles.fuelLabel, compact && { fontSize: 9 }]}>
+            AVG. FUEL
+          </Text>
+          <Text style={[styles.fuelValue, compact && { fontSize: 16 }]}>
+            {avgFuel.toFixed(1)}{" "}
+            <Text style={[styles.unitSmall, compact && { fontSize: 10 }]}>
+              km/L
+            </Text>
           </Text>
         </View>
       </View>
+
       <View style={styles.gridContainer}>
         <SensorCard
           icon="flash"
@@ -67,19 +81,33 @@ const DataGrid = memo(({ data, instFuel, avgFuel, compact = false }: any) => {
           compact={compact}
         />
       </View>
-      <View style={styles.trimContainer}>
+
+      {/* KOTAK TRIM DIPERAS */}
+      <View
+        style={[
+          styles.trimContainer,
+          compact && { marginTop: 16, paddingVertical: 12 },
+        ]}
+      >
         <View style={styles.trimBox}>
-          <Text style={styles.trimLabel}>STFT</Text>
-          <Text style={styles.trimValue}>{data.st.toFixed(1)}%</Text>
+          <Text style={[styles.trimLabel, compact && { fontSize: 9 }]}>
+            STFT
+          </Text>
+          <Text style={[styles.trimValue, compact && { fontSize: 14 }]}>
+            {data.st.toFixed(1)}%
+          </Text>
         </View>
         <View style={styles.trimBox}>
-          <Text style={styles.trimLabel}>LTFT</Text>
-          <Text style={styles.trimValue}>{data.lt.toFixed(1)}%</Text>
+          <Text style={[styles.trimLabel, compact && { fontSize: 9 }]}>
+            LTFT
+          </Text>
+          <Text style={[styles.trimValue, compact && { fontSize: 14 }]}>
+            {data.lt.toFixed(1)}%
+          </Text>
         </View>
       </View>
     </>
   );
 });
 
-// 2. Export komponen
 export default DataGrid;

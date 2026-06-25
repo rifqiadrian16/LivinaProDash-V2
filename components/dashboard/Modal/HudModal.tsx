@@ -43,91 +43,98 @@ export default function HudModal({
         }}
       >
         {/* VISUAL FEEDBACK: Ketuk 1x untuk keluar */}
+        {/* =====================================================
+            OVERLAY KONTROL (HANYA MUNCUL JIKA LAYAR DIKETUK 1X)
+            ===================================================== */}
         {tapCount === 1 && (
-          <View
-            style={{
-              position: "absolute",
-              top: 50,
-              alignSelf: "center",
-              backgroundColor: "rgba(255,255,255,0.08)",
-              paddingHorizontal: 20,
-              paddingVertical: 8,
-              borderRadius: 20,
-              borderWidth: 1,
-              borderColor: "rgba(255,255,255,0.2)",
-              zIndex: 100,
-            }}
-          >
-            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>
-              Ketuk lagi untuk keluar
-            </Text>
-          </View>
-        )}
-
-        {/* TOMBOL CEPAT: TOGGLE FLIP MIRROR */}
-        {onToggleMirror && (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={(e) => {
-              // Cegah event tap ini ikut kehitung sebagai "ketuk keluar HUD"
-              e.stopPropagation();
-              onToggleMirror();
-            }}
-            style={{
-              position: "absolute",
-              bottom: 10,
-              // Posisi kanan-atas secara visual tetap konsisten baik saat
-              // konten mirror maupun normal, karena tombol ini di luar
-              // kontainer yang di-scaleX(-1).
-              right: "50%",
-              zIndex: 100,
-              flexDirection: "row",
-              alignItems: "center",
-              backgroundColor: "rgba(255,255,255,0.08)",
-              paddingHorizontal: 12,
-              paddingVertical: 7,
-              borderRadius: 20,
-              borderWidth: 1,
-              borderColor: "rgba(255,255,255,0.2)",
-              gap: 6,
-            }}
-          >
-            <Ionicons
-              name="repeat-outline"
-              size={14}
-              color={mirrorEnabled ? "#00ffcc" : "rgba(255,255,255,0.5)"}
-            />
-            <Text
+          <>
+            {/* Teks Petunjuk Keluar (Tengah Atas) */}
+            <View
               style={{
-                color: mirrorEnabled ? "#00ffcc" : "rgba(255,255,255,0.5)",
-                fontSize: 10,
-                fontWeight: "bold",
-                letterSpacing: 1,
+                position: "absolute",
+                top: 50,
+                alignSelf: "center",
+                backgroundColor: "rgba(255,255,255,0.15)", // Sedikit lebih terang agar jelas
+                paddingHorizontal: 20,
+                paddingVertical: 8,
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: "rgba(255,255,255,0.3)",
+                zIndex: 100,
               }}
             >
-              {mirrorEnabled ? "MIRROR" : "NORMAL"}
-            </Text>
-          </TouchableOpacity>
+              <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>
+                Ketuk lagi untuk keluar
+              </Text>
+            </View>
+
+            {/* Tombol Mirror (Dipindah ke Pojok Kanan Atas) */}
+            {onToggleMirror && (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={(e) => {
+                  // Cegah event tap ini ikut kehitung sebagai "ketuk keluar HUD"
+                  e.stopPropagation();
+                  onToggleMirror();
+                }}
+                style={{
+                  position: "absolute",
+                  top: 50, // Sejajar dengan teks keluar
+                  right: 30, // Aman di pojok kanan atas
+                  zIndex: 100,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: "rgba(255,255,255,0.15)",
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: "rgba(255,255,255,0.3)",
+                  gap: 6,
+                }}
+              >
+                <Ionicons
+                  name="repeat-outline"
+                  size={16} // Ikon sedikit dibesarkan
+                  color={mirrorEnabled ? "#00ffcc" : "#fff"}
+                />
+                <Text
+                  style={{
+                    color: mirrorEnabled ? "#00ffcc" : "#fff",
+                    fontSize: 10,
+                    fontWeight: "bold",
+                    letterSpacing: 1,
+                  }}
+                >
+                  {mirrorEnabled ? "MIRROR" : "NORMAL"}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </>
         )}
 
         {/* =====================================================
-        KONTAINER CERMIN (MIRRORING)
-        - Mirror ON  -> dipakai untuk reflektor kaca depan (HUD projector),
-                        teks dibalik agar terbaca normal saat dipantulkan kaca.
-        - Mirror OFF -> dipakai untuk head unit / tampilan layar langsung,
-                        teks tampil normal tanpa pembalikan.
+        KONTAINER CERMIN (MIRRORING) & RESPONSIVE LAYOUT
         ===================================================== */}
         <View
           style={{
             transform: [{ scaleX: mirrorEnabled ? -1 : 1 }],
-            width: "92%",
+            width: "100%", // Diperluas ke 100% dari sebelumnya 92%
+            flex: 1, // Mengisi seluruh ruang vertikal
+            justifyContent: "space-between", // Tersebar rata atas, tengah, bawah
+            paddingVertical: 20, // Bantalan atas-bawah
+            paddingHorizontal: 30, // Bantalan kiri-kanan agar tidak nabrak pinggir layar
           }}
         >
           {/* -------------------------------------------------
-          BAGIAN ATAS: RPM BAR TEGAS (MONOKROM + REDLINE)
+          BAGIAN ATAS: RPM BAR TEGAS
           ------------------------------------------------- */}
           <View
-            style={{ width: "100%", marginBottom: 30, alignItems: "center" }}
+            style={{
+              width: "100%",
+              marginBottom: 10, // Margin disesuaikan karena sudah pakai space-between
+              alignItems: "center",
+            }}
           >
             <View
               style={{
@@ -136,7 +143,7 @@ export default function HudModal({
                 transform: [{ skewX: "-10deg" }],
               }}
             >
-              {/* Background track (Dengan bayangan Redline permanen) */}
+              {/* Background track */}
               <View
                 style={{
                   position: "absolute",
@@ -148,7 +155,6 @@ export default function HudModal({
                   overflow: "hidden",
                 }}
               >
-                {/* Track Normal (0 - 6500) = 81.25% dari total */}
                 <View
                   style={{
                     width: "81.25%",
@@ -156,7 +162,6 @@ export default function HudModal({
                     backgroundColor: "rgba(255,255,255,0.05)",
                   }}
                 />
-                {/* Track Redline (6500 - 8000) = 18.75% dari total */}
                 <View
                   style={{
                     width: "18.75%",
@@ -166,7 +171,7 @@ export default function HudModal({
                 />
               </View>
 
-              {/* Fill bars (Terbagi dua: Putih dan Merah) */}
+              {/* Fill bars */}
               <View
                 style={{
                   position: "absolute",
@@ -177,7 +182,6 @@ export default function HudModal({
                   width: "100%",
                 }}
               >
-                {/* Bar Putih Utama (Mentok di 6500 RPM) */}
                 <View
                   style={{
                     height: "100%",
@@ -193,7 +197,6 @@ export default function HudModal({
                   }}
                 />
 
-                {/* Bar Merah Redline (Hanya muncul jika RPM di atas 6500) */}
                 {data.r > 6500 && (
                   <View
                     style={{
@@ -211,16 +214,16 @@ export default function HudModal({
                 )}
               </View>
 
-              {/* Marker setiap 1000 RPM */}
+              {/* Marker setiap 1000 RPM (Ditebalkan & dipanjangkan) */}
               {[...Array(9)].map((_, i) => (
                 <View
                   key={`marker-${i}`}
                   style={{
                     position: "absolute",
                     left: `${(i / 8) * 100}%`,
-                    top: 24,
-                    width: 1.5,
-                    height: 16,
+                    top: 20, // Dinaikkan
+                    width: 2, // Dipertebal
+                    height: 20, // Diperpanjang
                     backgroundColor:
                       data.r >= i * 1000
                         ? i >= 7
@@ -232,21 +235,21 @@ export default function HudModal({
                 />
               ))}
 
-              {/* Angka RPM 0-8 */}
+              {/* Angka RPM */}
               {[...Array(9)].map((_, i) => (
                 <Text
                   key={`num-${i}`}
                   style={{
                     position: "absolute",
                     left: `${(i / 8) * 100}%`,
-                    top: 5,
+                    top: 0, // Disesuaikan dengan tinggi marker baru
                     color:
                       data.r >= i * 1000
                         ? i >= 7
                           ? "#ff4444"
                           : "#ffffff"
                         : "rgba(255,255,255,0.2)",
-                    fontSize: 13,
+                    fontSize: 14, // Sedikit dibesarkan
                     fontWeight: "900",
                     transform: [{ skewX: "10deg" }, { translateX: -5 }],
                     fontFamily: "monospace",
@@ -263,7 +266,7 @@ export default function HudModal({
                   right: 0,
                   top: 45,
                   color: "rgba(255,255,255,0.25)",
-                  fontSize: 9,
+                  fontSize: 10,
                   fontWeight: "bold",
                   transform: [{ skewX: "10deg" }],
                   letterSpacing: 1,
@@ -272,14 +275,14 @@ export default function HudModal({
                 ×1000 rpm
               </Text>
 
-              {/* Redline zone pembatas (Di-update ke 18.75% untuk area 6500-8000) */}
+              {/* Redline zone pembatas */}
               <View
                 style={{
                   position: "absolute",
                   right: 0,
-                  top: 24,
+                  top: 20,
                   width: "18.75%",
-                  height: 20,
+                  height: 24,
                   borderLeftWidth: 1,
                   borderLeftColor: "rgba(255,50,50,0.5)",
                 }}
@@ -293,16 +296,14 @@ export default function HudModal({
           <View
             style={{
               flexDirection: "row",
-              alignItems: "flex-end",
-              justifyContent: "center",
-              marginBottom: 25,
+              alignItems: "center", // Rata tengah
+              justifyContent: "space-between", // Tersebar ke ujung
               width: "100%",
+              flex: 1, // Mengisi sisa ruang kosong di tengah
             }}
           >
-            {/* KIRI: INDIKATOR GIGI (DINAMIS DARI JALUR NINJA) */}
-            <View
-              style={{ flex: 1, alignItems: "flex-start", paddingBottom: 12 }}
-            >
+            {/* KIRI: INDIKATOR GIGI */}
+            <View style={{ flex: 1, alignItems: "flex-start" }}>
               <Text
                 style={{
                   color: "#ffffff",
@@ -312,13 +313,12 @@ export default function HudModal({
                   opacity: 0.9,
                 }}
               >
-                {/* Menampilkan estimasi gigi (P/N, 1, 2, 3, 4) */}
                 {estimatedGear}
               </Text>
               <Text
                 style={{
                   color: "rgba(255,255,255,0.3)",
-                  fontSize: 9,
+                  fontSize: 10,
                   fontWeight: "bold",
                   letterSpacing: 2,
                   marginTop: -2,
@@ -340,10 +340,10 @@ export default function HudModal({
               <Text
                 style={{
                   color: data.s > 100 ? "#ff4444" : "#ffffff",
-                  fontSize: 150,
+                  fontSize: 160, // Sedikit dibesarkan
                   fontWeight: "900",
                   letterSpacing: -8,
-                  lineHeight: 150,
+                  lineHeight: 160,
                   textShadowColor: "rgba(255,255,255,0.1)",
                   textShadowRadius: 12,
                 }}
@@ -353,7 +353,7 @@ export default function HudModal({
               <Text
                 style={{
                   color: "rgba(255,255,255,0.4)",
-                  fontSize: 20,
+                  fontSize: 24, // Sedikit dibesarkan
                   fontWeight: "bold",
                   marginLeft: 8,
                   letterSpacing: 1,
@@ -363,7 +363,7 @@ export default function HudModal({
               </Text>
             </View>
 
-            {/* KANAN: KOSONG */}
+            {/* KANAN: KOSONG (Untuk penyeimbang Flexbox) */}
             <View style={{ flex: 1 }} />
           </View>
 
@@ -373,14 +373,13 @@ export default function HudModal({
           <View
             style={{
               flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
+              justifyContent: "space-between", // Tersebar jauh ke ujung kiri & kanan
+              alignItems: "flex-end", // Rata bawah
               width: "100%",
-              paddingHorizontal: 5,
             }}
           >
             {/* KIRI: FUEL */}
-            <View style={{ alignItems: "flex-start" }}>
+            <View style={{ flex: 1, alignItems: "flex-start" }}>
               <View style={{ marginBottom: 14 }}>
                 <Text style={styles.hudLabel}>INST</Text>
                 <View style={{ flexDirection: "row", alignItems: "baseline" }}>
@@ -398,8 +397,16 @@ export default function HudModal({
             </View>
 
             {/* TENGAH: TELEMETRI */}
-            <View style={{ alignItems: "center", flex: 1 }}>
-              <View style={{ flexDirection: "row", gap: 24 }}>
+            <View
+              style={{ flex: 1.5, alignItems: "center", paddingBottom: 10 }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-evenly",
+                  width: "100%",
+                }}
+              >
                 <View style={{ alignItems: "center" }}>
                   <Text style={styles.hudLabel}>VOLT</Text>
                   <Text
@@ -443,10 +450,51 @@ export default function HudModal({
                   </Text>
                 </View>
               </View>
+
+              {/* SHIFT LIGHT (DIPINDAHKAN KE TENGAH BAWAH AGAR RAPI) */}
+              {transmission === "manual" && (
+                <View
+                  style={{ marginTop: 25, alignItems: "center", width: "100%" }}
+                >
+                  <View style={{ flexDirection: "row", gap: 10 }}>
+                    {[4500, 5000, 5500, 6000, 6500].map((threshold, idx) => (
+                      <View
+                        key={idx}
+                        style={{
+                          width: 14, // Diperbesar
+                          height: 14, // Diperbesar
+                          borderRadius: 7,
+                          backgroundColor:
+                            data.r >= threshold
+                              ? idx >= 3
+                                ? "#ff3333"
+                                : "rgba(255,255,255,0.6)"
+                              : "rgba(255,255,255,0.08)",
+                          shadowColor:
+                            data.r >= threshold ? "#ff4444" : "transparent",
+                          shadowOpacity: data.r >= threshold ? 0.8 : 0,
+                          shadowRadius: data.r >= threshold ? 6 : 0,
+                        }}
+                      />
+                    ))}
+                  </View>
+                  <Text
+                    style={{
+                      color: "rgba(255,255,255,0.2)",
+                      fontSize: 8,
+                      fontWeight: "bold",
+                      letterSpacing: 2,
+                      marginTop: 6,
+                    }}
+                  >
+                    SHIFT
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* KANAN: TRIM */}
-            <View style={{ alignItems: "flex-end" }}>
+            <View style={{ flex: 1, alignItems: "flex-end" }}>
               <View
                 style={{
                   flexDirection: "row",
@@ -499,49 +547,6 @@ export default function HudModal({
               </View>
             </View>
           </View>
-
-          {/* -------------------------------------------------
-          SHIFT LIGHT (DIPERTAHANKAN UNTUK MODE MANUAL)
-          ------------------------------------------------- */}
-          {transmission === "manual" && (
-            <View
-              style={{ marginTop: 20, alignItems: "center", width: "100%" }}
-            >
-              <View style={{ flexDirection: "row", gap: 10 }}>
-                {[4500, 5000, 5500, 6000, 6500].map((threshold, idx) => (
-                  <View
-                    key={idx}
-                    style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: 6,
-                      backgroundColor:
-                        data.r >= threshold
-                          ? idx >= 3
-                            ? "#ff3333"
-                            : "rgba(255,255,255,0.6)"
-                          : "rgba(255,255,255,0.08)",
-                      shadowColor:
-                        data.r >= threshold ? "#ff4444" : "transparent",
-                      shadowOpacity: data.r >= threshold ? 0.8 : 0,
-                      shadowRadius: data.r >= threshold ? 6 : 0,
-                    }}
-                  />
-                ))}
-              </View>
-              <Text
-                style={{
-                  color: "rgba(255,255,255,0.2)",
-                  fontSize: 8,
-                  fontWeight: "bold",
-                  letterSpacing: 2,
-                  marginTop: 6,
-                }}
-              >
-                SHIFT
-              </Text>
-            </View>
-          )}
         </View>
       </TouchableOpacity>
     </Modal>

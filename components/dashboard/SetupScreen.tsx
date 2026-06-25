@@ -2,7 +2,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
 import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { styles } from "../../styles/dashboard.styles";
 
 export default function SetupScreen({
@@ -10,8 +13,19 @@ export default function SetupScreen({
   isConnecting,
   onSecretTap,
 }: any) {
+  const insets = useSafeAreaInsets();
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView
+      style={[
+        styles.safeArea,
+        {
+          // Paksa padding kiri dan kanan sama besar mengikuti ukuran notch/kamera
+          paddingLeft: Math.max(insets.left, insets.right),
+          paddingRight: Math.max(insets.left, insets.right),
+        },
+      ]}
+      edges={["top", "bottom"]} // Abaikan safe area kiri/kanan bawaan
+    >
       <StatusBar style="light" />
       <View style={styles.setupContainer}>
         <View style={styles.headerCentered}>

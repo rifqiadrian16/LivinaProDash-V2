@@ -6,10 +6,12 @@ import {
   Keyboard,
   Modal,
   Platform,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { styles } from "../../../styles/dashboard.styles";
 
@@ -45,6 +47,9 @@ export default function SettingsModal({
 }: any) {
   const [secretTapCount, setSecretTapCount] = useState(0);
   const keyboardOffset = useRef(new Animated.Value(0)).current;
+
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
 
   // ==========================================
   // LOGIKA ANIMASI KEYBOARD: TRANSLATE Y
@@ -118,7 +123,14 @@ export default function SettingsModal({
             </View>
 
             {/* SCROLLVIEW SUDAH MUSNAH */}
-            <View style={{ paddingBottom: 20 }}>
+            <ScrollView
+              style={{ maxHeight: isLandscape ? 450 : 800 }} // Batasi tinggi agar bisa di-scroll di Head Unit
+              contentContainerStyle={{
+                paddingBottom: 20,
+                paddingHorizontal: 2,
+              }}
+              showsVerticalScrollIndicator={true}
+            >
               {/* TAB SELECTOR */}
               <View
                 style={{
@@ -402,7 +414,7 @@ export default function SettingsModal({
                   </Text>
                 </TouchableOpacity>
               )}
-            </View>
+            </ScrollView>
           </Animated.View>
         </View>
       </Modal>
@@ -442,7 +454,11 @@ export default function SettingsModal({
               </View>
             ) : (
               // SCROLLVIEW DIHAPUS, DIGANTI VIEW BIASA
-              <View style={{ maxHeight: 250 }}>
+              <ScrollView
+                style={{ maxHeight: isLandscape ? 140 : 250 }}
+                showsVerticalScrollIndicator={true}
+                nestedScrollEnabled={true}
+              >
                 {scannedDevices.length === 0 ? (
                   <Text
                     style={{ color: "#888", textAlign: "center", padding: 20 }}
@@ -464,7 +480,7 @@ export default function SettingsModal({
                     </TouchableOpacity>
                   ))
                 )}
-              </View>
+              </ScrollView>
             )}
           </View>
         </View>

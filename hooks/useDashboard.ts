@@ -692,22 +692,40 @@ export default function useDashboard() {
   };
 
   const enterHudMode = async () => {
-    await ScreenOrientation.lockAsync(
-      ScreenOrientation.OrientationLock.LANDSCAPE,
-    );
-    await NavigationBar.setVisibilityAsync("hidden");
-    RNStatusBar.setHidden(true, "none");
-    await activateKeepAwakeAsync("hud");
+    // 1. Matikan fungsi rotasi & status bar jika dibuka di Web
+    if (Platform.OS !== "web") {
+      try {
+        await ScreenOrientation.lockAsync(
+          ScreenOrientation.OrientationLock.LANDSCAPE,
+        );
+        await NavigationBar.setVisibilityAsync("hidden");
+        RNStatusBar.setHidden(true, "none");
+        await activateKeepAwakeAsync("hud");
+      } catch (error) {
+        console.log("Gagal lock orientation di HUD:", error);
+      }
+    }
+
+    // 2. Ini yang paling penting: State Modal HUD akan SELALU jalan
     setIsHudMode(true);
   };
 
   const exitHudMode = async () => {
-    await ScreenOrientation.lockAsync(
-      ScreenOrientation.OrientationLock.PORTRAIT_UP,
-    );
-    await NavigationBar.setVisibilityAsync("visible");
-    RNStatusBar.setHidden(false, "slide");
-    await deactivateKeepAwake("hud");
+    // 1. Matikan fungsi rotasi & status bar jika dibuka di Web
+    if (Platform.OS !== "web") {
+      try {
+        await ScreenOrientation.lockAsync(
+          ScreenOrientation.OrientationLock.PORTRAIT_UP,
+        );
+        await NavigationBar.setVisibilityAsync("visible");
+        RNStatusBar.setHidden(false, "slide");
+        await deactivateKeepAwake("hud");
+      } catch (error) {
+        console.log("Gagal unlock orientation di HUD:", error);
+      }
+    }
+
+    // 2. State untuk menutup Modal HUD SELALU jalan
     setIsHudMode(false);
     if (hudTapTimer.current) {
       clearTimeout(hudTapTimer.current);
