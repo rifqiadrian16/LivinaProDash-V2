@@ -1,9 +1,11 @@
+// app/(tabs)/_layout.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
-import { Tabs } from "expo-router";
+import { Tabs } from "expo-router"; // <-- Hapus Stack dari sini
 import * as TaskManager from "expo-task-manager";
 import React, { useEffect } from "react";
 import { Platform, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AlertProvider } from "../../components/AlertContext";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { initDB } from "../../utils/database";
@@ -22,16 +24,19 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     initDB();
   }, []);
 
+  // <-- Logika Immersive Mode sudah dihapus dari sini (dipindah ke Root)
+
   return (
     <AlertProvider>
       <Tabs
         screenOptions={{
-          tabBarActiveTintColor: "#00FF88", // Warna Cyan Premium
+          tabBarActiveTintColor: "#00FF88",
           tabBarInactiveTintColor: isDark ? "#666666" : "#999999",
           headerShown: false,
 
@@ -41,26 +46,19 @@ export default function TabLayout() {
             bottom: Platform.OS === "ios" ? 24 : 16,
             left: 20,
             right: 20,
-            height: 64,
             borderTopWidth: 0,
-            // 1. KITA BUANG WARNA DAN SHADOW DARI SINI
+            paddingBottom: insets.bottom > 0 ? insets.bottom + 5 : 15,
+            height: insets.bottom > 0 ? 50 + insets.bottom : 70,
             backgroundColor: "transparent",
             elevation: 0,
             shadowOpacity: 0,
           },
 
-          /* --- PENGATURAN BACKGROUND & SHADOW (SOLUSI KOTAK HANTU) --- */
+          /* --- PENGATURAN BACKGROUND & SHADOW --- */
           tabBarBackground: () => (
             <View style={styles.blurContainerWrapper}>
-              <View
-                style={[
-                  styles.blurContainer,
-                  // isDark ? styles.bgDark : styles.bgLight,
-                  styles.bgDark,
-                ]}
-              >
+              <View style={[styles.blurContainer, styles.bgDark]}>
                 <BlurView
-                  // tint={isDark ? "dark" : "light"}
                   tint={"dark"}
                   intensity={80}
                   style={StyleSheet.absoluteFill}
@@ -69,9 +67,7 @@ export default function TabLayout() {
             </View>
           ),
 
-          tabBarItemStyle: {
-            paddingVertical: 8,
-          },
+          tabBarItemStyle: { paddingVertical: 8 },
           tabBarLabelStyle: {
             fontSize: 10,
             fontWeight: "700",
@@ -80,6 +76,7 @@ export default function TabLayout() {
           },
         }}
       >
+        {/* Screen Tabs Anda Tetap Sama */}
         <Tabs.Screen
           name="index"
           options={{
@@ -146,36 +143,26 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  /* --- WADAH LUAR: KHUSUS UNTUK SHADOW --- */
   blurContainerWrapper: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 32,
     backgroundColor: "transparent",
-    // Taruh shadow di sini agar mengikuti bentuk borderRadius
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 15,
     elevation: 10,
   },
-
-  /* --- WADAH DALAM: KHUSUS UNTUK WARNA & BLUR --- */
   blurContainer: {
     flex: 1,
     borderRadius: 32,
-    overflow: "hidden", // Ini yang memotong "kotak hantu"
+    overflow: "hidden",
     borderWidth: 1,
   },
   bgDark: {
     backgroundColor: "rgba(10, 10, 10, 0.65)",
     borderColor: "rgba(255, 255, 255, 0.05)",
   },
-  bgLight: {
-    backgroundColor: "rgba(255, 255, 255, 0.7)",
-    borderColor: "rgba(0, 0, 0, 0.05)",
-  },
-
-  /* --- ICON STYLES --- */
   iconContainer: {
     alignItems: "center",
     justifyContent: "center",
