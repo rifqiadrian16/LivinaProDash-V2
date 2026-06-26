@@ -6,12 +6,11 @@ import * as FileSystem from "expo-file-system/legacy";
 import { useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Modal,
   ScrollView,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import {
   SafeAreaView,
@@ -26,8 +25,11 @@ import { tripStyles as styles } from "../../styles/trip.styles";
 import { getDB } from "../../utils/database";
 import { getMapHtml } from "../../utils/tripTemplates";
 
+const GLOBAL_FUEL_KEY = "@prodash_lifetime_fuel_global";
+
 export default function TripScreen() {
   const { showAlert, showConfirm } = useAlert();
+  const [globalAppFuel, setGlobalAppFuel] = useState<string>("0.00");
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
   const [playbackIndex, setPlaybackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -45,6 +47,19 @@ export default function TripScreen() {
   const [lifetimeDistance, setLifetimeDistance] = useState("0");
   const [lifetimeAvgFuel, setLifetimeAvgFuel] = useState("0.0");
   const insets = useSafeAreaInsets();
+
+  const syncGlobalFuelAmount = async () => {
+    try {
+      const savedAmount = await AsyncStorage.getItem(GLOBAL_FUEL_KEY);
+      if (savedAmount) {
+        setGlobalAppFuel(parseFloat(savedAmount).toFixed(2));
+      } else {
+        setGlobalAppFuel("0.00");
+      }
+    } catch (e) {
+      console.log("Gagal memuat bensin global", e);
+    }
+  };
 
   const getTripPoints = (tripId: string) => {
     try {
@@ -449,6 +464,26 @@ export default function TripScreen() {
     }
   };
 
+  const handleResetGlobalFuel = () => {
+    showConfirm(
+      "Reset Konsumsi Global",
+      "Apakah Anda yakin ingin mengosongkan rekaman total konsumsi bahan bakar aplikasi dari awal?",
+      async () => {
+        try {
+          await AsyncStorage.setItem(GLOBAL_FUEL_KEY, "0.0");
+          setGlobalAppFuel("0.00");
+          showAlert(
+            "BERHASIL",
+            "Data total konsumsi global telah dibersihkan kembali ke nol.",
+            "success",
+          );
+        } catch (err) {
+          showAlert("GAGAL", "Gagal mereset penyimpanan internal HP.", "error");
+        }
+      },
+    );
+  };
+
   useEffect(() => {
     if (tripHistory && tripHistory.length > 0) {
       let totalDist = 0;
@@ -479,6 +514,7 @@ export default function TripScreen() {
   useFocusEffect(
     useCallback(() => {
       syncTrips();
+      syncGlobalFuelAmount();
     }, []),
   );
 
@@ -509,14 +545,12 @@ export default function TripScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 15 }]}>
+      {/* HEADER LOGS */}
       <View style={styles.headerRow}>
-        {/* Bungkus judul dan tombol dummy jadi satu baris */}
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <Text style={styles.headerTitle}>
             TRIP <Text style={{ color: "#00ff88" }}>LOGS</Text>
           </Text>
-
-          {/* TOMBOL DARURAT INJECT DUMMY */}
           <TouchableOpacity
             onPress={injectDummyData}
             style={{
@@ -529,24 +563,65 @@ export default function TripScreen() {
             <Text style={{ color: "#fff", fontSize: 10 }}>Inject Dummy</Text>
           </TouchableOpacity>
         </View>
+        <TouchableOpacity
+          style={styles.syncBtn}
+          onPress={() => {
+            syncTrips();
+            syncGlobalFuelAmount();
+          }}
+          disabled={isSyncing}
+        >
+          <Ionicons name="sync-circle-outline" size={24} color="#00ff88" />
+        </TouchableOpacity>
+      </View>
 
-        <View style={{ flexDirection: "row", gap: 12 }}>
+      {/* CARD BARU: PANEL AKUMULASI GLOBAL DARI APLIKASI BERJALAN */}
+      <View
+        style={[
+          styles.summaryCard,
+          { marginBottom: 15, borderColor: "#30D158", borderWidth: 0.5 },
+        ]}
+      >
+        <Text style={[styles.summaryTitle, { color: "#30D158" }]}>
+          GLOBAL ECU POWER ON CONSUMPTION
+        </Text>
+        <View style={styles.summaryGrid}>
+          <View style={[styles.summaryItem, { flex: 2 }]}>
+            <Text style={[styles.summaryValue, { color: "#FFFFFF" }]}>
+              {globalAppFuel}
+              <Text style={styles.summaryUnit}> Liters</Text>
+            </Text>
+            <Text style={styles.summaryLabel}>TOTAL APPS FUEL EXPENDED</Text>
+          </View>
+          <View style={styles.summaryDivider} />
           <TouchableOpacity
-            style={styles.syncBtn}
-            onPress={syncTrips}
-            disabled={isSyncing}
+            onPress={handleResetGlobalFuel}
+            style={{
+              justifyContent: "center",
+              alignItems: "center",
+              paddingHorizontal: 15,
+            }}
           >
-            {isSyncing ? (
-              <ActivityIndicator size="small" color="#00ff88" />
-            ) : (
-              <Ionicons name="sync-circle-outline" size={24} color="#00ff88" />
-            )}
+            <Ionicons name="refresh-circle" size={32} color="#FF453A" />
+            <Text
+              style={{
+                color: "#FF453A",
+                fontSize: 9,
+                fontWeight: "800",
+                marginTop: 2,
+              }}
+            >
+              RESET
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
 
+      {/* STATISTIK BAWAAN TRIP SEBELUMNYA */}
       <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>LIFETIME STATS</Text>
+        <Text style={styles.summaryTitle}>
+          LIFETIME STATS (TRIP RECORD ONLY)
+        </Text>
         <View style={styles.summaryGrid}>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryValue}>

@@ -22,6 +22,7 @@ import {
 import useBLE from "./useBLE";
 
 const BACKGROUND_LOCATION_TASK = "LIVINA_BACKGROUND_TRACKING";
+const GLOBAL_FUEL_KEY = "@prodash_lifetime_fuel_global";
 
 export default function useDashboard() {
   const { showAlert } = useAlert();
@@ -38,6 +39,8 @@ export default function useDashboard() {
   const lastTapTime = useRef(0);
   const [isBypassed, setIsBypassed] = useState(false);
   const [bypassTapCount, setBypassTapCount] = useState(0);
+  const lastGlobalFuelSaveTime = useRef(Date.now());
+  const globalFuelAccumulator = useRef(0.0);
 
   const [hudTapCount, setHudTapCount] = useState(0);
   const hudTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -447,31 +450,48 @@ export default function useDashboard() {
     const dt = (now - lastUpdateTime.current) / 3600000;
     lastUpdateTime.current = now;
 
-    // === RUMUS BENSIN BARU (LEBIH REALISTIS / TIDAK TERLALU IRIT) ===
+    // === RUMUS BENSIN SEPERTI ASLINYA ===
     let targetAFR = 14.7;
-
     if (newData.th > 60) targetAFR = 11.5;
     else if (newData.th > 40) targetAFR = 12.5;
     else if (newData.th > 20) targetAFR = 13.5;
 
     let fuelFlow = (newData.m / targetAFR / 730.0) * 3600.0;
-
     const fuelCalibration = 1.28;
     fuelFlow =
       fuelFlow * (1 + (newData.st + newData.lt) / 100) * fuelCalibration;
 
     const isDFCO = newData.th < 0 && newData.s > 20 && newData.r > 1200;
     if (isDFCO) fuelFlow = 0;
-    // ===============================================================
 
+    // JALANKAN AKUMULASI GLOBAL SETIAP KALI DATA ECU TERHUBUNG (TANPA SYARAT RECORD ACTIVE)
     if (dt > 0 && dt < 0.003) {
-      // 1. Akumulasi jarak dan bensin selama ECU terkoneksi
-      sessionStats.current.distance += newData.s * dt;
-      sessionStats.current.fuel += fuelFlow * dt;
+      const frameFuelConsumption = fuelFlow * dt; // Konsumsi dalam satuan liter pada frame waktu berjalan
 
-      // 2. Kalkulasi rata-rata (Jarak / Bensin) dan update ke layar
+      // 1. Akumulasi internal dashboard trip standar (seperti bawaan mas)
+      sessionStats.current.distance += newData.s * dt;
+      sessionStats.current.fuel += frameFuelConsumption;
+
       if (sessionStats.current.fuel > 0) {
         setAvgFuel(sessionStats.current.distance / sessionStats.current.fuel);
+      }
+
+      // 2. KUNCI UTAMA: Akumulasikan ke buffer global
+      globalFuelAccumulator.current += frameFuelConsumption;
+
+      // Flush/Tembak buffer ke dalam AsyncStorage secara berkala per 5 detik demi efisiensi resource RAM
+      if (now - lastGlobalFuelSaveTime.current > 5000) {
+        lastGlobalFuelSaveTime.current = now;
+        const cachedFuelToSave = globalFuelAccumulator.current;
+        globalFuelAccumulator.current = 0.0; // reset buffer sesaat
+
+        AsyncStorage.getItem(GLOBAL_FUEL_KEY)
+          .then((storedValue) => {
+            const currentTotal = storedValue ? parseFloat(storedValue) : 0.0;
+            const finalUpdatedTotal = currentTotal + cachedFuelToSave;
+            AsyncStorage.setItem(GLOBAL_FUEL_KEY, finalUpdatedTotal.toString());
+          })
+          .catch((e) => console.log("Gagal simpan bensin global", e));
       }
     }
 
