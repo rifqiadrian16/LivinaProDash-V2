@@ -16,6 +16,7 @@ export default function DashboardHeader({
   onDisconnect,
   isObdStandby,
   onOpenTerminal,
+  isLocked,
 }: any) {
   const tapCount = useRef(0);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -40,11 +41,33 @@ export default function DashboardHeader({
 
   return (
     <View style={styles.header}>
-      <TouchableWithoutFeedback onPress={handleBrandTap}>
-        <View>
-          <Text style={styles.brandText}>PRODASH</Text>
+      <View>
+        <TouchableWithoutFeedback onPress={handleBrandTap}>
+          <View>
+            <Text style={styles.brandText}>PRODASH</Text>
+          </View>
+        </TouchableWithoutFeedback>
+        <View
+          style={{ flexDirection: "row", alignItems: "center", marginTop: 3 }}
+        >
+          <Ionicons
+            name={isLocked ? "lock-closed" : "lock-open"}
+            size={10}
+            color={isLocked ? "#00ff88" : "#888"}
+          />
+          <Text
+            style={{
+              fontSize: 9,
+              fontWeight: "bold",
+              letterSpacing: 0.5,
+              marginLeft: 4,
+              color: isLocked ? "#00ff88" : "#888",
+            }}
+          >
+            {isLocked ? "TERKUNCI" : "TERBUKA"}
+          </Text>
         </View>
-      </TouchableWithoutFeedback>
+      </View>
       <View style={styles.headerRight}>
         <TouchableOpacity onPress={onEnterHud} style={styles.iconBtn}>
           <Ionicons

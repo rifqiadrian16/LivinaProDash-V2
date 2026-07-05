@@ -13,16 +13,17 @@ import {
   StatusBar as RNStatusBar,
 } from "react-native";
 import { useAlert } from "../components/AlertContext";
+import { useBLEContext } from "../components/BLEContext";
 import {
   getDB,
   insertNewTrip,
   insertTripPoint,
   updateTripStats,
 } from "../utils/database";
-import useBLE from "./useBLE";
 
 const BACKGROUND_LOCATION_TASK = "LIVINA_BACKGROUND_TRACKING";
 const GLOBAL_FUEL_KEY = "@prodash_lifetime_fuel_global";
+const GLOBAL_DIST_KEY = "@prodash_lifetime_dist_global";
 
 export default function useDashboard() {
   const { showAlert } = useAlert();
@@ -41,6 +42,7 @@ export default function useDashboard() {
   const [bypassTapCount, setBypassTapCount] = useState(0);
   const lastGlobalFuelSaveTime = useRef(Date.now());
   const globalFuelAccumulator = useRef(0.0);
+  const globalDistAccumulator = useRef(0.0);
 
   const [hudTapCount, setHudTapCount] = useState(0);
   const hudTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -478,13 +480,18 @@ export default function useDashboard() {
 
       // 2. KUNCI UTAMA: Akumulasikan ke buffer global
       globalFuelAccumulator.current += frameFuelConsumption;
+      globalDistAccumulator.current += newData.s * dt;
 
       // Flush/Tembak buffer ke dalam AsyncStorage secara berkala per 5 detik demi efisiensi resource RAM
       if (now - lastGlobalFuelSaveTime.current > 5000) {
         lastGlobalFuelSaveTime.current = now;
         const cachedFuelToSave = globalFuelAccumulator.current;
-        globalFuelAccumulator.current = 0.0; // reset buffer sesaat
+        const cachedDistToSave = globalDistAccumulator.current;
 
+        globalFuelAccumulator.current = 0.0;
+        globalDistAccumulator.current = 0.0;
+
+        // Simpan Bensin
         AsyncStorage.getItem(GLOBAL_FUEL_KEY)
           .then((storedValue) => {
             const currentTotal = storedValue ? parseFloat(storedValue) : 0.0;
@@ -492,6 +499,15 @@ export default function useDashboard() {
             AsyncStorage.setItem(GLOBAL_FUEL_KEY, finalUpdatedTotal.toString());
           })
           .catch((e) => console.log("Gagal simpan bensin global", e));
+
+        // Simpan Jarak
+        AsyncStorage.getItem(GLOBAL_DIST_KEY)
+          .then((storedValue) => {
+            const currentTotal = storedValue ? parseFloat(storedValue) : 0.0;
+            const finalUpdatedTotal = currentTotal + cachedDistToSave;
+            AsyncStorage.setItem(GLOBAL_DIST_KEY, finalUpdatedTotal.toString());
+          })
+          .catch((e) => console.log("Gagal simpan jarak global", e));
       }
     }
 
@@ -564,7 +580,27 @@ export default function useDashboard() {
     scanForDevices,
     sendMessage,
     disconnectDevice,
-  } = useBLE(updateData, handleRawText);
+    subscribeData,
+    subscribeRaw,
+  } = useBLEContext();
+
+  // Ref trick (pola sama kayak di useBLE.ts) — listener yang didaftarkan
+  // ke Context selalu pakai versi updateData/handleRawText TERBARU,
+  // tanpa subscribe-unsubscribe ulang tiap render.
+  const updateDataRef = useRef(updateData);
+  updateDataRef.current = updateData;
+  const handleRawTextRef = useRef(handleRawText);
+  handleRawTextRef.current = handleRawText;
+
+  useEffect(() => {
+    const unsubData = subscribeData((d: any) => updateDataRef.current(d));
+    const unsubRaw = subscribeRaw((t: string) => handleRawTextRef.current(t));
+    return () => {
+      unsubData();
+      unsubRaw();
+    };
+  }, []);
+
   const isConnectedRef = useRef(isConnected);
 
   useEffect(() => {
@@ -734,22 +770,16 @@ export default function useDashboard() {
     // 1. Matikan fungsi rotasi & status bar jika dibuka di Web
     if (Platform.OS !== "web") {
       try {
-        await ScreenOrientation.lockAsync(
-          ScreenOrientation.OrientationLock.PORTRAIT_UP,
-        );
+        // ✅ FIX: unlock total, JANGAN paksa PORTRAIT_UP.
+        // Kalau sebelum masuk HUD orientasi udah landscape (head unit),
+        // ini biar balik bebas ngikutin sensor, bukan nyangkut portrait.
+        await ScreenOrientation.unlockAsync();
         await NavigationBar.setVisibilityAsync("visible");
         RNStatusBar.setHidden(false, "slide");
         await deactivateKeepAwake("hud");
       } catch (error) {
         console.log("Gagal unlock orientation di HUD:", error);
       }
-    }
-
-    // 2. State untuk menutup Modal HUD SELALU jalan
-    setIsHudMode(false);
-    if (hudTapTimer.current) {
-      clearTimeout(hudTapTimer.current);
-      setHudTapCount(0);
     }
   };
 

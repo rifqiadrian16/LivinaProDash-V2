@@ -70,6 +70,7 @@ export default function DashboardScreen() {
                 onDisconnect={actions.disconnectOBD}
                 isObdStandby={state.isObdStandby}
                 onOpenTerminal={() => actions.setShowTerminal(true)}
+                isLocked={state.data.l === 1}
               />
             </View>
 

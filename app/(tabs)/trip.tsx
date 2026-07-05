@@ -5,13 +5,7 @@ import Slider from "@react-native-community/slider";
 import * as FileSystem from "expo-file-system/legacy";
 import { useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Modal,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View
-} from "react-native";
+import { Modal, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -26,10 +20,11 @@ import { getDB } from "../../utils/database";
 import { getMapHtml } from "../../utils/tripTemplates";
 
 const GLOBAL_FUEL_KEY = "@prodash_lifetime_fuel_global";
+const GLOBAL_DIST_KEY = "@prodash_lifetime_dist_global";
 
 export default function TripScreen() {
   const { showAlert, showConfirm } = useAlert();
-  const [globalAppFuel, setGlobalAppFuel] = useState<string>("0.00");
+  const [globalAvgFuel, setGlobalAvgFuel] = useState<string>("0.0");
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
   const [playbackIndex, setPlaybackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -48,16 +43,23 @@ export default function TripScreen() {
   const [lifetimeAvgFuel, setLifetimeAvgFuel] = useState("0.0");
   const insets = useSafeAreaInsets();
 
-  const syncGlobalFuelAmount = async () => {
+  const syncGlobalStats = async () => {
     try {
-      const savedAmount = await AsyncStorage.getItem(GLOBAL_FUEL_KEY);
-      if (savedAmount) {
-        setGlobalAppFuel(parseFloat(savedAmount).toFixed(2));
+      const savedFuel = await AsyncStorage.getItem(GLOBAL_FUEL_KEY);
+      const savedDist = await AsyncStorage.getItem(GLOBAL_DIST_KEY);
+
+      const fuel = savedFuel ? parseFloat(savedFuel) : 0;
+      const dist = savedDist ? parseFloat(savedDist) : 0;
+
+      // Hitung rata-rata jika bensin > 0 agar tidak error infinity
+      if (fuel > 0 && dist > 0) {
+        const avg = dist / fuel;
+        setGlobalAvgFuel(avg.toFixed(1));
       } else {
-        setGlobalAppFuel("0.00");
+        setGlobalAvgFuel("0.0");
       }
     } catch (e) {
-      console.log("Gagal memuat bensin global", e);
+      console.log("Gagal memuat statistik global", e);
     }
   };
 
@@ -471,7 +473,8 @@ export default function TripScreen() {
       async () => {
         try {
           await AsyncStorage.setItem(GLOBAL_FUEL_KEY, "0.0");
-          setGlobalAppFuel("0.00");
+          await AsyncStorage.setItem(GLOBAL_DIST_KEY, "0.0"); // <--- Reset jarak juga
+          setGlobalAvgFuel("0.0");
           showAlert(
             "BERHASIL",
             "Data total konsumsi global telah dibersihkan kembali ke nol.",
@@ -514,7 +517,7 @@ export default function TripScreen() {
   useFocusEffect(
     useCallback(() => {
       syncTrips();
-      syncGlobalFuelAmount();
+      syncGlobalStats();
     }, []),
   );
 
@@ -567,7 +570,7 @@ export default function TripScreen() {
           style={styles.syncBtn}
           onPress={() => {
             syncTrips();
-            syncGlobalFuelAmount();
+            syncGlobalStats();
           }}
           disabled={isSyncing}
         >
@@ -588,10 +591,12 @@ export default function TripScreen() {
         <View style={styles.summaryGrid}>
           <View style={[styles.summaryItem, { flex: 2 }]}>
             <Text style={[styles.summaryValue, { color: "#FFFFFF" }]}>
-              {globalAppFuel}
-              <Text style={styles.summaryUnit}> Liters</Text>
+              {globalAvgFuel} {/* <--- Variabel baru */}
+              <Text style={styles.summaryUnit}> km/L</Text>{" "}
+              {/* <--- Satuan berubah */}
             </Text>
-            <Text style={styles.summaryLabel}>TOTAL APPS FUEL EXPENDED</Text>
+            <Text style={styles.summaryLabel}>AVERAGE FUEL (ALL TIME)</Text>
+            {/* <--- Label berubah */}
           </View>
           <View style={styles.summaryDivider} />
           <TouchableOpacity
@@ -618,7 +623,7 @@ export default function TripScreen() {
       </View>
 
       {/* STATISTIK BAWAAN TRIP SEBELUMNYA */}
-      <View style={styles.summaryCard}>
+      {/* <View style={styles.summaryCard}>
         <Text style={styles.summaryTitle}>
           LIFETIME STATS (TRIP RECORD ONLY)
         </Text>
@@ -639,7 +644,7 @@ export default function TripScreen() {
             <Text style={styles.summaryLabel}>TOTAL DISTANCE</Text>
           </View>
         </View>
-      </View>
+      </View> */}
 
       <Text style={styles.sectionTitle}>RECENT TRIPS</Text>
 

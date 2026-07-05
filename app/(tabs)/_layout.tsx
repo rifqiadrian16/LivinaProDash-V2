@@ -7,6 +7,7 @@ import React, { useEffect } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AlertProvider } from "../../components/AlertContext";
+import { BLEProvider } from "../../components/BLEContext";
 import { useColorScheme } from "../../hooks/use-color-scheme";
 import { initDB } from "../../utils/database";
 
@@ -34,110 +35,121 @@ export default function TabLayout() {
 
   return (
     <AlertProvider>
-      <Tabs
-        screenOptions={{
-          tabBarActiveTintColor: "#00FF88",
-          tabBarInactiveTintColor: isDark ? "#666666" : "#999999",
-          headerShown: false,
+      <BLEProvider>
+        <Tabs
+          screenOptions={{
+            tabBarActiveTintColor: "#00FF88",
+            tabBarInactiveTintColor: isDark ? "#666666" : "#999999",
+            headerShown: false,
 
-          /* --- PENGATURAN TAB BAR UTAMA --- */
-          tabBarStyle: {
-            position: "absolute",
-            bottom: Platform.OS === "ios" ? 24 : 16,
-            left: 20,
-            right: 20,
-            borderTopWidth: 0,
-            paddingBottom: insets.bottom > 0 ? insets.bottom + 5 : 15,
-            height: insets.bottom > 0 ? 50 + insets.bottom : 70,
-            backgroundColor: "transparent",
-            elevation: 0,
-            shadowOpacity: 0,
-          },
+            /* --- PENGATURAN TAB BAR UTAMA --- */
+            tabBarStyle: {
+              position: "absolute",
+              bottom: Platform.OS === "ios" ? 24 : 16,
+              left: 20,
+              right: 20,
+              borderTopWidth: 0,
+              paddingBottom: insets.bottom > 0 ? insets.bottom + 5 : 15,
+              height: insets.bottom > 0 ? 50 + insets.bottom : 70,
+              backgroundColor: "transparent",
+              elevation: 0,
+              shadowOpacity: 0,
+            },
 
-          /* --- PENGATURAN BACKGROUND & SHADOW --- */
-          tabBarBackground: () => (
-            <View style={styles.blurContainerWrapper}>
-              <View style={[styles.blurContainer, styles.bgDark]}>
-                <BlurView
-                  tint={"dark"}
-                  intensity={80}
-                  style={StyleSheet.absoluteFill}
-                />
-              </View>
-            </View>
-          ),
-
-          tabBarItemStyle: { paddingVertical: 8 },
-          tabBarLabelStyle: {
-            fontSize: 10,
-            fontWeight: "700",
-            letterSpacing: 0.5,
-            marginBottom: 4,
-          },
-        }}
-      >
-        {/* Screen Tabs Anda Tetap Sama */}
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: "DASH",
-            tabBarIcon: ({ color, focused }) => (
-              <View style={styles.iconContainer}>
-                <Ionicons
-                  name={focused ? "speedometer" : "speedometer-outline"}
-                  size={24}
-                  color={color}
-                />
-                {focused && (
-                  <View
-                    style={[styles.activeIndicator, { backgroundColor: color }]}
+            /* --- PENGATURAN BACKGROUND & SHADOW --- */
+            tabBarBackground: () => (
+              <View style={styles.blurContainerWrapper}>
+                <View style={[styles.blurContainer, styles.bgDark]}>
+                  <BlurView
+                    tint={"dark"}
+                    intensity={80}
+                    style={StyleSheet.absoluteFill}
                   />
-                )}
+                </View>
               </View>
             ),
+
+            tabBarItemStyle: { paddingVertical: 8 },
+            tabBarLabelStyle: {
+              fontSize: 10,
+              fontWeight: "700",
+              letterSpacing: 0.5,
+              marginBottom: 4,
+            },
           }}
-        />
-        <Tabs.Screen
-          name="trip"
-          options={{
-            title: "TRIPS",
-            tabBarIcon: ({ color, focused }) => (
-              <View style={styles.iconContainer}>
-                <Ionicons
-                  name={focused ? "map" : "map-outline"}
-                  size={24}
-                  color={color}
-                />
-                {focused && (
-                  <View
-                    style={[styles.activeIndicator, { backgroundColor: color }]}
+        >
+          {/* Screen Tabs Anda Tetap Sama */}
+          <Tabs.Screen
+            name="index"
+            options={{
+              title: "DASH",
+              tabBarIcon: ({ color, focused }) => (
+                <View style={styles.iconContainer}>
+                  <Ionicons
+                    name={focused ? "speedometer" : "speedometer-outline"}
+                    size={24}
+                    color={color}
                   />
-                )}
-              </View>
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="diagnostics"
-          options={{
-            title: "DIAGNOSTICS",
-            tabBarIcon: ({ color, focused }) => (
-              <View style={styles.iconContainer}>
-                <Ionicons
-                  name={focused ? "construct" : "construct-outline"}
-                  size={24}
-                  color={color}
-                />
-                {focused && (
-                  <View
-                    style={[styles.activeIndicator, { backgroundColor: color }]}
+                  {focused && (
+                    <View
+                      style={[
+                        styles.activeIndicator,
+                        { backgroundColor: color },
+                      ]}
+                    />
+                  )}
+                </View>
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="trip"
+            options={{
+              title: "TRIPS",
+              tabBarIcon: ({ color, focused }) => (
+                <View style={styles.iconContainer}>
+                  <Ionicons
+                    name={focused ? "map" : "map-outline"}
+                    size={24}
+                    color={color}
                   />
-                )}
-              </View>
-            ),
-          }}
-        />
-      </Tabs>
+                  {focused && (
+                    <View
+                      style={[
+                        styles.activeIndicator,
+                        { backgroundColor: color },
+                      ]}
+                    />
+                  )}
+                </View>
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="diagnostics"
+            options={{
+              title: "DIAGNOSTICS",
+              tabBarIcon: ({ color, focused }) => (
+                <View style={styles.iconContainer}>
+                  <Ionicons
+                    name={focused ? "construct" : "construct-outline"}
+                    size={24}
+                    color={color}
+                  />
+                  {focused && (
+                    <View
+                      style={[
+                        styles.activeIndicator,
+                        { backgroundColor: color },
+                      ]}
+                    />
+                  )}
+                </View>
+              ),
+            }}
+          />
+        </Tabs>
+      </BLEProvider>
     </AlertProvider>
   );
 }
