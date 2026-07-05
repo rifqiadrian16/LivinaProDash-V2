@@ -781,6 +781,13 @@ export default function useDashboard() {
         console.log("Gagal unlock orientation di HUD:", error);
       }
     }
+
+    // 2. State untuk menutup Modal HUD SELALU jalan
+    setIsHudMode(false);
+    if (hudTapTimer.current) {
+      clearTimeout(hudTapTimer.current);
+      setHudTapCount(0);
+    }
   };
 
   const handleSetupSecretTap = () => {
