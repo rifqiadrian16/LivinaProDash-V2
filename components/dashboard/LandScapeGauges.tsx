@@ -79,6 +79,9 @@ const RoundGauge = memo(
     needleColor: string;
     radius: number;
   }) => {
+    const { height } = useWindowDimensions();
+    const isHpLandscape = height < 480;
+
     const size = radius * 2 + 40; // padding utk tickmark+angka di luar ring
     const cx = size / 2;
     const cy = size / 2;
@@ -114,7 +117,9 @@ const RoundGauge = memo(
         ? animatedValue.toFixed(decimals)
         : Math.round(animatedValue);
 
-    const tickFontSize = Math.max(9, radius * 0.1);
+    const tickFontSize = isHpLandscape
+      ? Math.max(7, radius * 0.065) // <-- Hanya mengecil saat di HP Landscape
+      : Math.max(9, radius * 0.1);
     const needleLen = radius - 12;
 
     return (
@@ -259,7 +264,7 @@ const LandscapeGauges = memo(
     // Tinggi yang tersedia kira-kira tinggi layar dikurangi area
     // header (~70) dan clearance tab bar (~90, sudah di-handle parent
     // lewat marginBottom, jadi di sini cukup estimasi tinggi kasar).
-    const availableWidthForBothGauges = screenWidth / 2 - 32 - 12; // dikurangi padding & gap
+    const availableWidthForBothGauges = screenWidth / 2 - 16 - 8; // dikurangi padding & gap
     const availableHeight = screenHeight - 70 - 90 - 40; // header + tabbar clearance + margin badge gear
 
     // Radius dibatasi oleh DUA kendala: lebar (2 gauge harus muat
@@ -269,7 +274,7 @@ const LandscapeGauges = memo(
     const radiusFromHeight = (availableHeight - 10) / 2 / 0.62 - 20;
 
     let radius = Math.min(radiusFromWidth, radiusFromHeight);
-    radius = Math.max(56, Math.min(radius, 130)); // batas wajar: tidak terlalu kecil/besar
+    radius = Math.max(56, Math.min(radius, 155)); // batas wajar: tidak terlalu kecil/besar
 
     const rpmTicks = [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000];
     const speedTicks = Array.from(
@@ -356,8 +361,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     color: "#888888",
-    letterSpacing: 3,
-    marginTop: 5,
+    letterSpacing: 2,
+    marginTop: 2,
   },
   textRed: { color: "#FF3B30" },
   gaugeTitle: {

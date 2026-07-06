@@ -15,25 +15,24 @@ const SensorCard = memo(
             styles.card,
             {
               width: "49%",
-              marginBottom: 12,
-              paddingVertical: 18,
-              paddingHorizontal: 17,
+              marginBottom: 6,
+              paddingVertical: 9,
+              paddingHorizontal: 14,
               minHeight: 0,
-              flexDirection: "row", // Menyamping
-              alignItems: "center", // Vertikal di tengah
-              // Kita hapus justifyContent di sini karena akan diatur oleh anak-anaknya
+              flexDirection: "row",
+              alignItems: "center",
             },
           ]}
         >
           {/* KOLOM 1 (KIRI): IKON */}
           <View style={{ flex: 1, alignItems: "flex-start" }}>
-            <Ionicons name={icon} size={26} color={color} />
+            <Ionicons name={icon} size={18} color={color} />
           </View>
 
           {/* KOLOM 2 (TENGAH): ANGKA (VALUE) */}
           <View style={{ flex: 1.5, alignItems: "center" }}>
             <Text
-              style={[styles.cardValue, { fontSize: 18, marginVertical: 0 }]}
+              style={[styles.cardValue, { fontSize: 14, marginVertical: 0 }]}
             >
               {value}
             </Text>
@@ -44,7 +43,7 @@ const SensorCard = memo(
             <Text
               style={[
                 styles.cardLabel,
-                { fontSize: 11, marginTop: 0, textAlign: "right" },
+                { fontSize: 8, marginTop: 0, textAlign: "right" },
               ]}
             >
               {label}

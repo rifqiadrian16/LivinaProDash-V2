@@ -10,7 +10,7 @@ const DataGrid = memo(({ data, instFuel, avgFuel, compact = false }: any) => {
       <View
         style={[
           styles.fuelRow,
-          compact && { marginBottom: 16, paddingVertical: 12 },
+          compact && { marginBottom: 8, paddingVertical: 8 },
         ]}
       >
         <View style={styles.fuelItem}>
@@ -86,7 +86,7 @@ const DataGrid = memo(({ data, instFuel, avgFuel, compact = false }: any) => {
       <View
         style={[
           styles.trimContainer,
-          compact && { marginTop: 16, paddingVertical: 12 },
+          compact && { marginTop: 8, paddingVertical: 6 },
         ]}
       >
         <View style={styles.trimBox}>

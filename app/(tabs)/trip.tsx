@@ -5,7 +5,15 @@ import Slider from "@react-native-community/slider";
 import * as FileSystem from "expo-file-system/legacy";
 import { useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Modal, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import {
+  Modal,
+  Platform,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -25,6 +33,7 @@ const GLOBAL_DIST_KEY = "@prodash_lifetime_dist_global";
 export default function TripScreen() {
   const { showAlert, showConfirm } = useAlert();
   const [globalAvgFuel, setGlobalAvgFuel] = useState<string>("0.0");
+  const [globalTotalFuel, setGlobalTotalFuel] = useState<string>("0.0");
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
   const [playbackIndex, setPlaybackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -43,6 +52,11 @@ export default function TripScreen() {
   const [lifetimeAvgFuel, setLifetimeAvgFuel] = useState("0.0");
   const insets = useSafeAreaInsets();
 
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
+  const isTabletLandscape = isLandscape && height >= 480;
+  const isPhoneLandscape = isLandscape && height < 480;
+
   const syncGlobalStats = async () => {
     try {
       const savedFuel = await AsyncStorage.getItem(GLOBAL_FUEL_KEY);
@@ -51,7 +65,10 @@ export default function TripScreen() {
       const fuel = savedFuel ? parseFloat(savedFuel) : 0;
       const dist = savedDist ? parseFloat(savedDist) : 0;
 
-      // Hitung rata-rata jika bensin > 0 agar tidak error infinity
+      // Format Total Fuel
+      setGlobalTotalFuel(fuel.toFixed(1)); // <-- [TAMBAHKAN INI]
+
+      // Hitung Rata-rata
       if (fuel > 0 && dist > 0) {
         const avg = dist / fuel;
         setGlobalAvgFuel(avg.toFixed(1));
@@ -64,6 +81,85 @@ export default function TripScreen() {
   };
 
   const getTripPoints = (tripId: string) => {
+    if (Platform.OS === "web") {
+      return [
+        {
+          time: "06:30",
+          latitude: -6.84,
+          longitude: 106.77,
+          speed: 40,
+          rpm: 1800,
+          temp: 85,
+          instFuel: 12.0,
+          iat: 30,
+          maf: 14.5,
+          stft: 1,
+          timing: 15,
+          throttle: 15,
+          note: "Gerbang Tol Parungkuda",
+        },
+        {
+          time: "06:40",
+          latitude: -6.78,
+          longitude: 106.81,
+          speed: 100,
+          rpm: 2800,
+          temp: 88,
+          instFuel: 16.5,
+          iat: 31,
+          maf: 22.1,
+          stft: -2,
+          timing: 32,
+          throttle: 20,
+          note: "Cruising Stabil",
+        },
+        {
+          time: "06:45",
+          latitude: -6.72,
+          longitude: 106.83,
+          speed: 120,
+          rpm: 3500,
+          temp: 92,
+          instFuel: 10.5,
+          iat: 32,
+          maf: 30.0,
+          stft: 3,
+          timing: 38,
+          throttle: 35,
+          note: "Overtaking (Gaspol)",
+        },
+        {
+          time: "06:55",
+          latitude: -6.68,
+          longitude: 106.84,
+          speed: 80,
+          rpm: 2200,
+          temp: 89,
+          instFuel: 18.0,
+          iat: 31,
+          maf: 18.0,
+          stft: 0,
+          timing: 28,
+          throttle: 15,
+          note: "Turunan (Eco Mode)",
+        },
+        {
+          time: "07:00",
+          latitude: -6.65,
+          longitude: 106.85,
+          speed: 30,
+          rpm: 1500,
+          temp: 86,
+          instFuel: 14.0,
+          iat: 33,
+          maf: 12.0,
+          stft: -1,
+          timing: 14,
+          throttle: 10,
+          note: "Keluar GT Ciawi",
+        },
+      ];
+    }
     try {
       const db = getDB();
       return db.getAllSync(
@@ -186,6 +282,47 @@ export default function TripScreen() {
 
   const syncTrips = () => {
     setIsSyncing(true);
+    if (Platform.OS === "web") {
+      console.log("[WEB MODE] Memuat Mock Data tanpa SQLite...");
+      setTripHistory([
+        {
+          id: "web-dummy-1",
+          date: "02 Jun 2026, 06:30",
+          route: "Tol Bocimi (Parungkuda - Ciawi)",
+          distance: "35.5 km",
+          time: "30m",
+          fuel: "2.1 L",
+          ecoScore: 85,
+          details: {
+            topSpeed: "120",
+            maxRpm: "3500",
+            fuelUsed: "2.1",
+            cost: "Rp 21.000",
+            peakAlt: "520",
+            climb: "150",
+          },
+        },
+        {
+          id: "web-dummy-2",
+          date: "02 Jun 2026, 16:45",
+          route: "Macet Jl. A. Yani - Cisaat",
+          distance: "4.2 km",
+          time: "45m",
+          fuel: "0.8 L",
+          ecoScore: 40,
+          details: {
+            topSpeed: "35",
+            maxRpm: "2200",
+            fuelUsed: "0.8",
+            cost: "Rp 8.000",
+            peakAlt: "600",
+            climb: "40",
+          },
+        },
+      ]);
+      setTimeout(() => setIsSyncing(false), 300);
+      return; // <-- Hentikan sampai di sini agar tidak memanggil SQLite!
+    }
     try {
       const db = getDB();
       // Sedot data header trip dari SQLite
@@ -487,6 +624,255 @@ export default function TripScreen() {
     );
   };
 
+  // ===================================================================
+  // FUNGSI PEMBANTU 1: ISI KOLOM KIRI (MAPS & CONTROLLER SLIDER)
+  // ===================================================================
+  const renderLeftColumnContent = () => (
+    <>
+      {/* Tombol Filter Map */}
+      <View
+        style={{
+          flexDirection: "row",
+          gap: 8,
+          paddingHorizontal: 10,
+          marginBottom: isPhoneLandscape ? 4 : 8,
+          justifyContent: "center",
+        }}
+      >
+        {(["dark", "normal", "satellite"] as const).map((type) => (
+          <TouchableOpacity
+            key={type}
+            onPress={() => setPlaybackMapType(type)}
+            style={{
+              paddingHorizontal: isPhoneLandscape ? 10 : 16,
+              paddingVertical: isPhoneLandscape ? 2 : 4,
+              borderRadius: 20,
+              backgroundColor: playbackMapType === type ? "#00ff88" : "#333",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: isPhoneLandscape ? 10 : 11,
+                fontWeight: "bold",
+                textTransform: "uppercase",
+                color: playbackMapType === type ? "#121212" : "#fff",
+              }}
+            >
+              {type}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Area Maps Interaktif */}
+      <View
+        style={[
+          styles.mapContainer,
+          isTabletLandscape && {
+            flex: 1,
+            height: undefined,
+            minHeight: 220,
+            marginBottom: 10,
+          },
+          isPhoneLandscape && { height: 180, minHeight: 110, marginBottom: 4 },
+        ]}
+        onTouchStart={(e) => {
+          if (e.nativeEvent.touches.length > 1) setIsScrollEnabled(false);
+        }}
+        onTouchMove={(e) => {
+          if (e.nativeEvent.touches.length > 1) setIsScrollEnabled(false);
+          else setIsScrollEnabled(true);
+        }}
+        onTouchEnd={(e) => {
+          if (e.nativeEvent.touches.length < 2) setIsScrollEnabled(true);
+        }}
+        onTouchCancel={(e) => {
+          if (e.nativeEvent.touches.length < 2) setIsScrollEnabled(true);
+        }}
+      >
+        <WebView
+          ref={webViewRef}
+          style={styles.map}
+          source={{ html: getMapHtml(selectedTrip, playbackMapType) }}
+          scrollEnabled={false}
+          showsVerticalScrollIndicator={false}
+          showsHorizontalScrollIndicator={false}
+        />
+      </View>
+
+      {/* Kontrol Playback & Slider */}
+      <View
+        style={[
+          styles.playbackContainer,
+          isLandscape && {
+            marginHorizontal: 0,
+            marginBottom: isPhoneLandscape ? 2 : 8,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={[
+            styles.playBtn,
+            isPhoneLandscape && { width: 36, height: 36 },
+          ]}
+          onPress={() => {
+            if (playbackIndex >= selectedTrip.routeData.length - 1)
+              setPlaybackIndex(0);
+            setIsPlaying(!isPlaying);
+          }}
+        >
+          <Ionicons
+            name={isPlaying ? "pause" : "play"}
+            size={isPhoneLandscape ? 20 : 24}
+            color="#121212"
+          />
+        </TouchableOpacity>
+        <View style={styles.sliderWrapper}>
+          <Slider
+            style={{ width: "100%", height: isPhoneLandscape ? 30 : 36 }}
+            minimumValue={0}
+            maximumValue={selectedTrip.routeData.length - 1}
+            step={1}
+            value={playbackIndex}
+            onValueChange={(val) => {
+              setIsPlaying(false);
+              setPlaybackIndex(val);
+            }}
+            minimumTrackTintColor="#00ff88"
+            maximumTrackTintColor="#333"
+            thumbTintColor="#fff"
+          />
+          <View style={styles.timeLabels}>
+            <Text style={styles.timeText}>00:00</Text>
+            <Text style={styles.timeTextCurrent}>
+              {selectedTrip.routeData[playbackIndex]?.time || "00:00"}
+            </Text>
+            <Text style={styles.timeText}>{selectedTrip.time}</Text>
+          </View>
+        </View>
+      </View>
+    </>
+  );
+
+  // ===================================================================
+  // FUNGSI PEMBANTU 2: ISI KOLOM KANAN (TELEMETRY & TRIP SUMMARY)
+  // ===================================================================
+  const renderRightColumnContent = () => (
+    <>
+      <View
+        style={[
+          styles.inspectorCard,
+          isLandscape && { marginTop: 0, marginHorizontal: 0 },
+        ]}
+      >
+        <View style={styles.inspectorHeader}>
+          <Ionicons name="analytics" size={20} color="#00ff88" />
+          <Text style={styles.inspectorTitle}>LIVE TELEMETRY</Text>
+          <Text style={styles.inspectorNote}>
+            {selectedTrip.routeData[playbackIndex]?.note || ""}
+          </Text>
+        </View>
+
+        <View style={styles.inspectorGrid}>
+          <View style={styles.inspectorBox}>
+            <Text style={styles.inspectorLabel}>SPEED</Text>
+            <Text style={[styles.inspectorValue, { color: "#00ff88" }]}>
+              {selectedTrip.routeData[playbackIndex]?.speed || 0}{" "}
+              <Text style={styles.inspectorUnit}>km/h</Text>
+            </Text>
+          </View>
+          <View style={styles.inspectorBox}>
+            <Text style={styles.inspectorLabel}>RPM</Text>
+            <Text style={[styles.inspectorValue, { color: "#ff4444" }]}>
+              {selectedTrip.routeData[playbackIndex]?.rpm || 0}
+            </Text>
+          </View>
+          <View style={styles.inspectorBox}>
+            <Text style={styles.inspectorLabel}>TEMP</Text>
+            <Text style={styles.inspectorValue}>
+              {selectedTrip.routeData[playbackIndex]?.temp || 0}
+            </Text>
+          </View>
+          <View style={styles.inspectorBox}>
+            <Text style={styles.inspectorLabel}>INST FUEL</Text>
+            <Text style={[styles.inspectorValue, { color: "#ffcc00" }]}>
+              {selectedTrip.routeData[playbackIndex]?.instFuel || 0}
+            </Text>
+          </View>
+
+          <View style={styles.gridDivider} />
+
+          <View style={styles.inspectorBox}>
+            <Text style={styles.inspectorLabel}>IAT</Text>
+            <Text style={styles.inspectorValue}>
+              {selectedTrip.routeData[playbackIndex]?.iat || 0}
+            </Text>
+          </View>
+          <View style={styles.inspectorBox}>
+            <Text style={styles.inspectorLabel}>MAF</Text>
+            <Text style={styles.inspectorValue}>
+              {selectedTrip.routeData[playbackIndex]?.maf || 0}{" "}
+              <Text style={styles.inspectorUnit}>g/s</Text>
+            </Text>
+          </View>
+          <View style={styles.inspectorBox}>
+            <Text style={styles.inspectorLabel}>STFT</Text>
+            <Text
+              style={[
+                styles.inspectorValue,
+                {
+                  color:
+                    selectedTrip.routeData[playbackIndex]?.stft > 0
+                      ? "#ff4444"
+                      : "#00cc00",
+                },
+              ]}
+            >
+              {selectedTrip.routeData[playbackIndex]?.stft || 0}%
+            </Text>
+          </View>
+          <View style={styles.inspectorBox}>
+            <Text style={styles.inspectorLabel}>TIMING</Text>
+            <Text style={styles.inspectorValue}>
+              {selectedTrip.routeData[playbackIndex]?.timing || 0}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <Text style={[styles.sectionTitle, isLandscape && { marginTop: 10 }]}>
+        TRIP SUMMARY
+      </Text>
+
+      <View style={[styles.detailGrid, isLandscape && { marginHorizontal: 0 }]}>
+        <View style={styles.detailBox}>
+          <Text style={styles.detailLabel}>TOP SPEED</Text>
+          <Text style={styles.detailValue}>
+            {selectedTrip.details?.topSpeed || 0}
+          </Text>
+        </View>
+        <View style={styles.detailBox}>
+          <Text style={styles.detailLabel}>MAX RPM</Text>
+          <Text style={[styles.detailValue, { color: "#ff4444" }]}>
+            {selectedTrip.details?.maxRpm || 0}
+          </Text>
+        </View>
+        <View style={styles.detailBox}>
+          <Text style={styles.detailLabel}>FUEL USED</Text>
+          <Text style={[styles.detailValue, { color: "#00cc00" }]}>
+            {selectedTrip.details?.fuelUsed || "0 L"}
+          </Text>
+        </View>
+        <View style={styles.detailBox}>
+          <Text style={styles.detailLabel}>EST COST</Text>
+          <Text style={styles.detailValue}>
+            {selectedTrip.details?.cost || "Rp 0"}
+          </Text>
+        </View>
+      </View>
+    </>
+  );
+
   useEffect(() => {
     if (tripHistory && tripHistory.length > 0) {
       let totalDist = 0;
@@ -546,10 +932,283 @@ export default function TripScreen() {
     }
   }, [playbackIndex]);
 
+  const renderGlobalStatsCard = () => (
+    <View
+      style={[
+        styles.summaryCard,
+        {
+          borderColor: "#30D158",
+          borderWidth: 0.5,
+          marginBottom: isLandscape ? 0 : 15,
+          paddingTop: isPhoneLandscape ? 12 : 16,
+          paddingBottom: isPhoneLandscape ? 12 : 16,
+          paddingHorizontal: isPhoneLandscape ? 12 : 16,
+          justifyContent: "space-between",
+        },
+      ]}
+    >
+      <Text
+        style={[
+          styles.summaryTitle,
+          { color: "#30D158" },
+          isPhoneLandscape && { fontSize: 10, marginBottom: 4 },
+        ]}
+      >
+        GLOBAL ECU POWER ON CONSUMPTION
+      </Text>
+
+      {/* ======================================================= */}
+      {/* [BAGIAN BARU] KONTEN TENGAH DIBELAH JADI 2 KOLOM (ROW)    */}
+      {/* ======================================================= */}
+      <View
+        style={{
+          width: "100%",
+          flexDirection: "row",
+          justifyContent: "center",
+          alignItems: "center",
+          paddingVertical: isPhoneLandscape ? 6 : 12,
+          minHeight: isPhoneLandscape ? 50 : 70,
+        }}
+      >
+        {/* KOLOM KIRI: AVERAGE FUEL */}
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <Text
+            style={[
+              styles.summaryValue,
+              {
+                color: "#FFFFFF",
+                fontWeight: "900",
+                lineHeight: isPhoneLandscape ? 30 : 40,
+                fontSize: isPhoneLandscape ? 24 : isTabletLandscape ? 34 : 32,
+              },
+            ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {globalAvgFuel}
+            <Text
+              style={[
+                styles.summaryUnit,
+                {
+                  fontSize: isPhoneLandscape ? 12 : 14,
+                  color: "#aaa",
+                  fontWeight: "bold",
+                },
+              ]}
+            >
+              {" "}
+              km/L
+            </Text>
+          </Text>
+          <Text
+            style={[
+              styles.summaryLabel,
+              {
+                fontSize: isPhoneLandscape ? 9 : 10,
+                color: "#888",
+                marginTop: 2,
+              },
+            ]}
+          >
+            AVG FUEL
+          </Text>
+        </View>
+
+        {/* GARIS PEMISAH VERTIKAL TIPIS DI TENGAH */}
+        <View
+          style={{
+            width: 1,
+            height: "80%",
+            backgroundColor: "#333",
+            marginHorizontal: 10,
+          }}
+        />
+
+        {/* KOLOM KANAN: TOTAL FUEL USED */}
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <Text
+            style={[
+              styles.summaryValue,
+              {
+                color: "#FFF", // Beda warna biar gampang dibedakan saat melirik
+                fontWeight: "900",
+                lineHeight: isPhoneLandscape ? 30 : 40,
+                fontSize: isPhoneLandscape ? 24 : isTabletLandscape ? 34 : 32,
+              },
+            ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {globalTotalFuel}
+            <Text
+              style={[
+                styles.summaryUnit,
+                {
+                  fontSize: isPhoneLandscape ? 12 : 14,
+                  color: "#aaa",
+                  fontWeight: "bold",
+                },
+              ]}
+            >
+              {" "}
+              L
+            </Text>
+          </Text>
+          <Text
+            style={[
+              styles.summaryLabel,
+              {
+                fontSize: isPhoneLandscape ? 9 : 10,
+                color: "#888",
+                marginTop: 2,
+              },
+            ]}
+          >
+            FUEL USED
+          </Text>
+        </View>
+      </View>
+
+      {/* Garis Pemisah (Divider Mendatar) Bawah */}
+      <View
+        style={[
+          styles.summaryDivider,
+          {
+            width: "100%",
+            height: 1,
+            marginVertical: isPhoneLandscape ? 6 : 10,
+            backgroundColor: "#333",
+          },
+        ]}
+      />
+
+      {/* Tombol Reset */}
+      <TouchableOpacity
+        onPress={handleResetGlobalFuel}
+        style={{
+          flexDirection: "row",
+          width: "100%",
+          justifyContent: "center",
+          alignItems: "center",
+          paddingVertical: isPhoneLandscape ? 8 : 10,
+          backgroundColor: "rgba(255, 69, 58, 0.15)",
+          borderRadius: 8,
+          gap: 6,
+        }}
+      >
+        <Ionicons
+          name="refresh-circle"
+          size={isPhoneLandscape ? 18 : 22}
+          color="#FF453A"
+        />
+        <Text style={{ color: "#FF453A", fontSize: 11, fontWeight: "800" }}>
+          RESET GLOBAL DATA
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // ===================================================================
+  // FUNGSI PEMBANTU 2: DAFTAR RECENT TRIPS
+  // ===================================================================
+  const renderRecentTrips = () =>
+    tripHistory.length === 0 ? (
+      <View style={styles.emptyStateContainer}>
+        <Ionicons name="car-sport-outline" size={64} color="#333" />
+        <Text style={styles.emptyStateTitle}>BELUM ADA DATA</Text>
+        <Text style={styles.emptyStateDesc}>
+          Perjalanan yang terekam akan muncul di sini.
+        </Text>
+      </View>
+    ) : (
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingBottom: 80,
+          // Kalau Tablet HU & di kolom kanan, tetap bisa dibuat 2 baris (wrap) jika muat
+          flexDirection: isTabletLandscape ? "row" : "column",
+          flexWrap: isTabletLandscape ? "wrap" : "nowrap",
+          justifyContent: "space-between",
+        }}
+      >
+        {tripHistory.map((trip) => (
+          <TouchableOpacity
+            key={trip.id}
+            style={[
+              styles.tripCard,
+              // Di Head Unit, kartu trip lebarnya 48% dari kolom kanan
+              isTabletLandscape && { width: "48%", marginBottom: 12 },
+              // Di HP Landscape, kartu 1 kolom penuh di area kanannya tapi lebih slim
+              isPhoneLandscape && {
+                marginBottom: 6,
+                paddingVertical: 10,
+                paddingHorizontal: 12,
+              },
+            ]}
+            activeOpacity={0.7}
+            onPress={() => {
+              const points = getTripPoints(trip.id);
+              setSelectedTrip({ ...trip, routeData: points });
+            }}
+          >
+            <View style={styles.tripHeader}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={14}
+                  color="#888"
+                  style={{ marginRight: 5 }}
+                />
+                <Text style={styles.tripDate}>{trip.date}</Text>
+              </View>
+              <View
+                style={[
+                  styles.ecoBadge,
+                  {
+                    backgroundColor:
+                      trip.ecoScore > 80
+                        ? "rgba(0, 204, 0, 0.2)"
+                        : "rgba(255, 204, 0, 0.2)",
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.ecoText,
+                    { color: trip.ecoScore > 80 ? "#00cc00" : "#ffcc00" },
+                  ]}
+                >
+                  ECO {trip.ecoScore}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.routeContainer}>
+              <Ionicons name="map-outline" size={24} color="#00ff88" />
+              <Text style={styles.routeText}>{trip.route}</Text>
+            </View>
+            <View style={styles.tripStatsGrid}>
+              <View style={styles.tripStatBox}>
+                <Ionicons name="speedometer-outline" size={16} color="#aaa" />
+                <Text style={styles.tripStatText}>{trip.distance}</Text>
+              </View>
+              <View style={styles.tripStatBox}>
+                <Ionicons name="time-outline" size={16} color="#aaa" />
+                <Text style={styles.tripStatText}>{trip.time}</Text>
+              </View>
+              <View style={styles.tripStatBox}>
+                <Ionicons name="water-outline" size={16} color="#aaa" />
+                <Text style={styles.tripStatText}>{trip.fuel || "0 L"}</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    );
+
   return (
     <View style={[styles.container, { paddingTop: insets.top + 15 }]}>
-      {/* HEADER LOGS */}
-      <View style={styles.headerRow}>
+      {/* HEADER LOGS (Selalu Paling Atas) */}
+      <View style={[styles.headerRow, isLandscape && { marginBottom: 0 }]}>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <Text style={styles.headerTitle}>
             TRIP <Text style={{ color: "#00ff88" }}>LOGS</Text>
@@ -578,157 +1237,38 @@ export default function TripScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* CARD BARU: PANEL AKUMULASI GLOBAL DARI APLIKASI BERJALAN */}
-      <View
-        style={[
-          styles.summaryCard,
-          { marginBottom: 15, borderColor: "#30D158", borderWidth: 0.5 },
-        ]}
-      >
-        <Text style={[styles.summaryTitle, { color: "#30D158" }]}>
-          GLOBAL ECU POWER ON CONSUMPTION
-        </Text>
-        <View style={styles.summaryGrid}>
-          <View style={[styles.summaryItem, { flex: 2 }]}>
-            <Text style={[styles.summaryValue, { color: "#FFFFFF" }]}>
-              {globalAvgFuel} {/* <--- Variabel baru */}
-              <Text style={styles.summaryUnit}> km/L</Text>{" "}
-              {/* <--- Satuan berubah */}
-            </Text>
-            <Text style={styles.summaryLabel}>AVERAGE FUEL (ALL TIME)</Text>
-            {/* <--- Label berubah */}
+      {/* ========================================================= */}
+      {/* KONTEN UTAMA: DIBELAH 2 JIKA LANDSCAPE, NORMAL JIKA PORTRAIT */}
+      {/* ========================================================= */}
+      {isLandscape ? (
+        /* --- MODE LANDSCAPE (HU & HP LAND): 2 KOLOM KIRI-KANAN --- */
+        <View style={{ flex: 1, flexDirection: "row", gap: 16, marginTop: 5 }}>
+          {/* KOLOM KIRI (Kecil: ~38% Lebar Layar): Khusus Global ECU */}
+          <View style={{ flex: isTabletLandscape ? 0.35 : 0.42 }}>
+            {renderGlobalStatsCard()}
           </View>
-          <View style={styles.summaryDivider} />
-          <TouchableOpacity
-            onPress={handleResetGlobalFuel}
-            style={{
-              justifyContent: "center",
-              alignItems: "center",
-              paddingHorizontal: 15,
-            }}
-          >
-            <Ionicons name="refresh-circle" size={32} color="#FF453A" />
+
+          {/* KOLOM KANAN (Sisa Ruang yang Luas: ~62%): Khusus Recent Trips */}
+          <View style={{ flex: 1 }}>
             <Text
-              style={{
-                color: "#FF453A",
-                fontSize: 9,
-                fontWeight: "800",
-                marginTop: 2,
-              }}
+              style={[styles.sectionTitle, { marginTop: 0, marginBottom: 8 }]}
             >
-              RESET
+              RECENT TRIPS
             </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* STATISTIK BAWAAN TRIP SEBELUMNYA */}
-      {/* <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>
-          LIFETIME STATS (TRIP RECORD ONLY)
-        </Text>
-        <View style={styles.summaryGrid}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>
-              {lifetimeAvgFuel}
-              <Text style={styles.summaryUnit}> km/L</Text>
-            </Text>
-            <Text style={styles.summaryLabel}>AVG FUEL</Text>
+            {renderRecentTrips()}
           </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>
-              {lifetimeDistance}
-              <Text style={styles.summaryUnit}> km</Text>
-            </Text>
-            <Text style={styles.summaryLabel}>TOTAL DISTANCE</Text>
-          </View>
-        </View>
-      </View> */}
-
-      <Text style={styles.sectionTitle}>RECENT TRIPS</Text>
-
-      {tripHistory.length === 0 ? (
-        <View style={styles.emptyStateContainer}>
-          <Ionicons name="car-sport-outline" size={64} color="#333" />
-          <Text style={styles.emptyStateTitle}>BELUM ADA DATA</Text>
-          <Text style={styles.emptyStateDesc}>
-            Perjalanan yang terekam akan muncul di sini.
-          </Text>
         </View>
       ) : (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 120 }}
-        >
-          {tripHistory.map((trip) => (
-            <TouchableOpacity
-              key={trip.id}
-              style={styles.tripCard}
-              activeOpacity={0.7}
-              onPress={() => {
-                const points = getTripPoints(trip.id);
-                setSelectedTrip({ ...trip, routeData: points });
-              }}
-            >
-              <View style={styles.tripHeader}>
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <Ionicons
-                    name="calendar-outline"
-                    size={14}
-                    color="#888"
-                    style={{ marginRight: 5 }}
-                  />
-                  <Text style={styles.tripDate}>{trip.date}</Text>
-                </View>
-                <View
-                  style={[
-                    styles.ecoBadge,
-                    {
-                      backgroundColor:
-                        trip.ecoScore > 80
-                          ? "rgba(0, 204, 0, 0.2)"
-                          : "rgba(255, 204, 0, 0.2)",
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.ecoText,
-                      { color: trip.ecoScore > 80 ? "#00cc00" : "#ffcc00" },
-                    ]}
-                  >
-                    ECO {trip.ecoScore}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.routeContainer}>
-                <Ionicons name="map-outline" size={24} color="#00ff88" />
-                <Text style={styles.routeText}>{trip.route}</Text>
-              </View>
-
-              <View style={styles.tripStatsGrid}>
-                <View style={styles.tripStatBox}>
-                  <Ionicons name="speedometer-outline" size={16} color="#aaa" />
-                  <Text style={styles.tripStatText}>{trip.distance}</Text>
-                </View>
-                <View style={styles.tripStatBox}>
-                  <Ionicons name="time-outline" size={16} color="#aaa" />
-                  <Text style={styles.tripStatText}>{trip.time}</Text>
-                </View>
-                <View style={styles.tripStatBox}>
-                  <Ionicons name="water-outline" size={16} color="#aaa" />
-                  <Text style={styles.tripStatText}>{trip.fuel || "0 L"}</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        /* --- MODE PORTRAIT (HP TEGAK): ATAS KE BAWAH --- */
+        <>
+          {renderGlobalStatsCard()}
+          <Text style={styles.sectionTitle}>RECENT TRIPS</Text>
+          {renderRecentTrips()}
+        </>
       )}
 
       {/* ========================================================= */}
-      {/* MODAL PLAYBACK TELEMETRY - 100% SESUAI DESAIN LAMA MAS      */}
+      {/* MODAL PLAYBACK TELEMETRY                                  */}
       {/* ========================================================= */}
       <Modal
         animationType="slide"
@@ -739,15 +1279,25 @@ export default function TripScreen() {
       >
         <SafeAreaView style={styles.modalContainer}>
           {selectedTrip && (
-            <ScrollView
-              style={styles.modalContent}
-              scrollEnabled={isScrollEnabled}
-              showsVerticalScrollIndicator={false}
+            <View
+              style={{
+                flex: 1,
+                paddingHorizontal: isTabletLandscape
+                  ? 24
+                  : isPhoneLandscape
+                    ? 12
+                    : 16,
+                paddingTop: isPhoneLandscape ? 4 : 10,
+              }}
             >
-              <View style={styles.modalHeader}>
-                {/* 1. Tambahkan flex: 1 dan marginRight agar tidak mendorong tombol */}
+              {/* HEADER MODAL */}
+              <View
+                style={[
+                  styles.modalHeader,
+                  isLandscape && { marginBottom: 4, paddingBottom: 4 },
+                ]}
+              >
                 <View style={{ flex: 1, marginRight: 15 }}>
-                  {/* 2. Tambahkan numberOfLines={1} agar teks kepanjangan jadi titik-titik */}
                   <Text
                     style={styles.modalTitle}
                     numberOfLines={1}
@@ -758,7 +1308,6 @@ export default function TripScreen() {
                   <Text style={styles.modalSubtitle}>Telemetry Playback</Text>
                 </View>
 
-                {/* Kumpulan Tombol Tetap Sama */}
                 <View style={{ flexDirection: "row", gap: 8 }}>
                   <TouchableOpacity
                     onPress={() => setShareTripData(selectedTrip)}
@@ -766,14 +1315,12 @@ export default function TripScreen() {
                   >
                     <Ionicons name="share-social" size={24} color="#fff" />
                   </TouchableOpacity>
-
                   <TouchableOpacity
                     onPress={() => deleteTrip(selectedTrip.id)}
                     style={styles.closeBtn}
                   >
                     <Ionicons name="trash-outline" size={24} color="#ff4444" />
                   </TouchableOpacity>
-
                   <TouchableOpacity
                     onPress={() => downloadToDevice(selectedTrip)}
                     style={styles.closeBtn}
@@ -784,7 +1331,6 @@ export default function TripScreen() {
                       color="#00ff88"
                     />
                   </TouchableOpacity>
-
                   <TouchableOpacity
                     onPress={() => setSelectedTrip(null)}
                     style={styles.closeBtn}
@@ -794,230 +1340,43 @@ export default function TripScreen() {
                 </View>
               </View>
 
-              <View
-                style={{
-                  flexDirection: "row",
-                  gap: 10,
-                  paddingHorizontal: 20,
-                  marginBottom: 15,
-                  justifyContent: "center",
-                }}
-              >
-                {(["dark", "normal", "satellite"] as const).map((type) => (
-                  <TouchableOpacity
-                    key={type}
-                    onPress={() => setPlaybackMapType(type)}
-                    style={{
-                      paddingHorizontal: 16,
-                      paddingVertical: 6,
-                      borderRadius: 20,
-                      backgroundColor:
-                        playbackMapType === type ? "#00ff88" : "#333",
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        fontWeight: "bold",
-                        textTransform: "uppercase",
-                        color: playbackMapType === type ? "#121212" : "#fff",
-                      }}
-                    >
-                      {type}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* AREA MAPS INTERAKTIF */}
-              <View
-                style={styles.mapContainer}
-                onTouchStart={(e) => {
-                  if (e.nativeEvent.touches.length > 1)
-                    setIsScrollEnabled(false);
-                }}
-                onTouchMove={(e) => {
-                  // Evaluasi ulang terus menerus saat jari bergerak
-                  if (e.nativeEvent.touches.length > 1) {
-                    setIsScrollEnabled(false);
-                  } else {
-                    setIsScrollEnabled(true);
-                  }
-                }}
-                onTouchEnd={(e) => {
-                  // Gembok HANYA DIBUKA jika jari yang menempel kurang dari 2
-                  if (e.nativeEvent.touches.length < 2)
-                    setIsScrollEnabled(true);
-                }}
-                onTouchCancel={(e) => {
-                  if (e.nativeEvent.touches.length < 2)
-                    setIsScrollEnabled(true);
-                }}
-              >
-                <WebView
-                  ref={webViewRef}
-                  style={styles.map}
-                  source={{ html: getMapHtml(selectedTrip, playbackMapType) }}
-                  scrollEnabled={false}
-                  showsVerticalScrollIndicator={false}
-                  showsHorizontalScrollIndicator={false}
-                />
-              </View>
-
-              {/* KONTROL PLAYBACK & SLIDER */}
-              <View style={styles.playbackContainer}>
-                <TouchableOpacity
-                  style={styles.playBtn}
-                  onPress={() => {
-                    if (playbackIndex >= selectedTrip.routeData.length - 1)
-                      setPlaybackIndex(0);
-                    setIsPlaying(!isPlaying);
+              {/* PERCABANGAN STRUKTUR MODAL PLAYBACK */}
+              {isLandscape ? (
+                <View
+                  style={{
+                    flex: 1,
+                    flexDirection: "row",
+                    gap: isTabletLandscape ? 20 : 10,
                   }}
                 >
-                  <Ionicons
-                    name={isPlaying ? "pause" : "play"}
-                    size={24}
-                    color="#121212"
-                  />
-                </TouchableOpacity>
+                  <View style={{ flex: isTabletLandscape ? 1.3 : 1.1 }}>
+                    {renderLeftColumnContent()}
+                  </View>
 
-                <View style={styles.sliderWrapper}>
-                  <Slider
-                    style={{ width: "100%", height: 40 }}
-                    minimumValue={0}
-                    maximumValue={selectedTrip.routeData.length - 1}
-                    step={1}
-                    value={playbackIndex}
-                    onValueChange={(val) => {
-                      setIsPlaying(false);
-                      setPlaybackIndex(val);
+                  <ScrollView
+                    style={{ flex: 1 }}
+                    contentContainerStyle={{
+                      paddingBottom: isPhoneLandscape ? 50 : 30,
                     }}
-                    minimumTrackTintColor="#00ff88"
-                    maximumTrackTintColor="#333"
-                    thumbTintColor="#fff"
-                  />
-                  <View style={styles.timeLabels}>
-                    <Text style={styles.timeText}>00:00</Text>
-                    <Text style={styles.timeTextCurrent}>
-                      {selectedTrip.routeData[playbackIndex]?.time || "00:00"}
-                    </Text>
-                    <Text style={styles.timeText}>{selectedTrip.time}</Text>
-                  </View>
+                    showsVerticalScrollIndicator={false}
+                  >
+                    {renderRightColumnContent()}
+                  </ScrollView>
                 </View>
-              </View>
-
-              {/* PANEL TELEMETRI REAL-TIME (8 SENSOR) */}
-              <View style={styles.inspectorCard}>
-                <View style={styles.inspectorHeader}>
-                  <Ionicons name="analytics" size={20} color="#00ff88" />
-                  <Text style={styles.inspectorTitle}>LIVE TELEMETRY</Text>
-                  <Text style={styles.inspectorNote}>
-                    {selectedTrip.routeData[playbackIndex]?.note || ""}
-                  </Text>
-                </View>
-
-                {/* Grid 2 Baris untuk menampung semua sensor */}
-                <View style={styles.inspectorGrid}>
-                  {/* BARIS 1: Sensor Dasar */}
-                  <View style={styles.inspectorBox}>
-                    <Text style={styles.inspectorLabel}>SPEED</Text>
-                    <Text style={[styles.inspectorValue, { color: "#00ff88" }]}>
-                      {selectedTrip.routeData[playbackIndex]?.speed || 0}{" "}
-                      <Text style={styles.inspectorUnit}>km/h</Text>
-                    </Text>
+              ) : (
+                <ScrollView
+                  style={{ flex: 1 }}
+                  contentContainerStyle={{ paddingBottom: 60 }}
+                  scrollEnabled={isScrollEnabled}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <View style={{ flexDirection: "column", gap: 10 }}>
+                    <View>{renderLeftColumnContent()}</View>
+                    <View>{renderRightColumnContent()}</View>
                   </View>
-                  <View style={styles.inspectorBox}>
-                    <Text style={styles.inspectorLabel}>RPM</Text>
-                    <Text style={[styles.inspectorValue, { color: "#ff4444" }]}>
-                      {selectedTrip.routeData[playbackIndex]?.rpm || 0}
-                    </Text>
-                  </View>
-                  <View style={styles.inspectorBox}>
-                    <Text style={styles.inspectorLabel}>TEMP</Text>
-                    <Text style={styles.inspectorValue}>
-                      {selectedTrip.routeData[playbackIndex]?.temp || 0}°C
-                    </Text>
-                  </View>
-                  <View style={styles.inspectorBox}>
-                    <Text style={styles.inspectorLabel}>INST FUEL</Text>
-                    <Text style={[styles.inspectorValue, { color: "#ffcc00" }]}>
-                      {selectedTrip.routeData[playbackIndex]?.instFuel || 0}
-                    </Text>
-                  </View>
-
-                  {/* Garis Pemisah Tipis */}
-                  <View style={styles.gridDivider} />
-
-                  {/* BARIS 2: Sensor Lanjutan (Advanced) */}
-                  <View style={styles.inspectorBox}>
-                    <Text style={styles.inspectorLabel}>IAT</Text>
-                    <Text style={styles.inspectorValue}>
-                      {selectedTrip.routeData[playbackIndex]?.iat || 0}°C
-                    </Text>
-                  </View>
-                  <View style={styles.inspectorBox}>
-                    <Text style={styles.inspectorLabel}>MAF</Text>
-                    <Text style={styles.inspectorValue}>
-                      {selectedTrip.routeData[playbackIndex]?.maf || 0}{" "}
-                      <Text style={styles.inspectorUnit}>g/s</Text>
-                    </Text>
-                  </View>
-                  <View style={styles.inspectorBox}>
-                    <Text style={styles.inspectorLabel}>STFT</Text>
-                    <Text
-                      style={[
-                        styles.inspectorValue,
-                        {
-                          color:
-                            selectedTrip.routeData[playbackIndex]?.stft > 0
-                              ? "#ff4444"
-                              : "#00cc00",
-                        },
-                      ]}
-                    >
-                      {selectedTrip.routeData[playbackIndex]?.stft || 0}%
-                    </Text>
-                  </View>
-                  <View style={styles.inspectorBox}>
-                    <Text style={styles.inspectorLabel}>TIMING</Text>
-                    <Text style={styles.inspectorValue}>
-                      {selectedTrip.routeData[playbackIndex]?.timing || 0}°
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              <Text style={styles.sectionTitle}>TRIP SUMMARY</Text>
-
-              <View style={styles.detailGrid}>
-                <View style={styles.detailBox}>
-                  <Text style={styles.detailLabel}>TOP SPEED</Text>
-                  <Text style={styles.detailValue}>
-                    {selectedTrip.details?.topSpeed || 0}
-                  </Text>
-                </View>
-                <View style={styles.detailBox}>
-                  <Text style={styles.detailLabel}>MAX RPM</Text>
-                  <Text style={[styles.detailValue, { color: "#ff4444" }]}>
-                    {selectedTrip.details?.maxRpm || 0}
-                  </Text>
-                </View>
-                <View style={styles.detailBox}>
-                  <Text style={styles.detailLabel}>FUEL USED</Text>
-                  <Text style={[styles.detailValue, { color: "#00cc00" }]}>
-                    {selectedTrip.details?.fuelUsed || "0 L"}
-                  </Text>
-                </View>
-                <View style={styles.detailBox}>
-                  <Text style={styles.detailLabel}>EST COST</Text>
-                  <Text style={styles.detailValue}>
-                    {selectedTrip.details?.cost || "Rp 0"}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={{ height: 50 }} />
-            </ScrollView>
+                </ScrollView>
+              )}
+            </View>
           )}
         </SafeAreaView>
       </Modal>

@@ -43,6 +43,8 @@ export default function DashboardScreen() {
   // width > height -> layout landscape 2-kolom (LandscapeGauges: RPM & Speed terpisah).
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
+  const isTabletLandscape = isLandscape && height >= 480;
+  const bottomReserve = isLandscape ? 55 : 85;
   const insets = useSafeAreaInsets();
 
   // 🛡️ GERBANG LOGIKA TAMPILAN DINAMIS
@@ -80,7 +82,7 @@ export default function DashboardScreen() {
                 flex: 1,
                 flexDirection: "row",
                 // Beri jarak di bawah agar tidak tertutup Tab Bar melayang (Tab Bar = ~64px)
-                paddingBottom: 85,
+                paddingBottom: bottomReserve,
               }}
             >
               {/* KOLOM KIRI (50%): GAUGE AREA */}
@@ -89,7 +91,7 @@ export default function DashboardScreen() {
                   flex: 1,
                   justifyContent: "center",
                   alignItems: "center",
-                  paddingHorizontal: 8,
+                  paddingHorizontal: 0,
                 }}
               >
                 <LandscapeGauges
@@ -100,21 +102,27 @@ export default function DashboardScreen() {
               </View>
 
               {/* KOLOM KANAN (50%): DATA GRID */}
-              <View
-                style={{
-                  flex: 1,
-                  paddingHorizontal: 8,
-                  // GANTI "center" MENJADI "space-between" atau "space-evenly"
-                  justifyContent: "center",
-                  paddingTop: 4, // Beri jarak napas sedikit di atas
-                }}
-              >
-                <DataGrid
-                  data={state.data}
-                  instFuel={state.instFuel}
-                  avgFuel={state.avgFuel}
-                  compact
-                />
+              <View style={{ flex: 1, paddingHorizontal: 8 }}>
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{
+                    flexGrow: 1,
+                    // 🔥 UBAH DISINI: Gunakan "space-evenly" di tablet agar mendistribusikan jarak vertikal secara merata
+                    justifyContent: isTabletLandscape
+                      ? "space-evenly"
+                      : "center",
+                    paddingTop: 4,
+                    paddingBottom: isTabletLandscape ? 10 : 0,
+                  }}
+                >
+                  <DataGrid
+                    data={state.data}
+                    instFuel={state.instFuel}
+                    avgFuel={state.avgFuel}
+                    // 🔥 UBAH DISINI: Matikan compact jika di tablet agar ukuran kartu sensor lebih besar & proporsional
+                    compact={!isTabletLandscape}
+                  />
+                </ScrollView>
               </View>
             </View>
           </View>
