@@ -85,7 +85,7 @@ const AnimatedTabItem = ({
           {
             color,
             marginTop: 2,
-            textAlign: "center", // <-- Paksa rata tengah
+            textAlign: "center",
             width: "100%",
             minWidth: 100,
             overflow: "visible", //

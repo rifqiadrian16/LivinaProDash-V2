@@ -9,6 +9,7 @@ export const fuelStyles = StyleSheet.create({
     color: "#fff",
     letterSpacing: 3,
     marginBottom: 20,
+    textAlign: "center",
   },
 
   heroCard: {

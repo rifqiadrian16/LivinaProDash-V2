@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useKeepAwake } from "expo-keep-awake";
 import React from "react";
 import {
   ActivityIndicator,
@@ -37,10 +38,7 @@ import { styles } from "../../styles/dashboard.styles";
 export default function DashboardScreen() {
   const { state, actions } = useDashboard();
 
-  // ✅ DETEKSI ORIENTASI OTOMATIS (tanpa lock manual)
-  // Di HP biasa: portrait -> width < height -> layout vertikal (lama, MainGauges).
-  // Di head unit (layar lebar permanen) atau HP yang diputar manual:
-  // width > height -> layout landscape 2-kolom (LandscapeGauges: RPM & Speed terpisah).
+  useKeepAwake();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   const isTabletLandscape = isLandscape && height >= 480;
@@ -63,7 +61,7 @@ export default function DashboardScreen() {
           // BUNGKUSAN UTAMA: Mengatur urutan dari Atas ke Bawah
           <View style={{ flex: 1, paddingTop: 8 }}>
             {/* 1. HEADER AREA (FULL WIDTH) */}
-            <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+            <View style={[{ paddingHorizontal: 16, paddingBottom: 0 }]}>
               <DashboardHeader
                 isConnected={state.isConnected}
                 isNightTime={state.isNightTime}
@@ -111,8 +109,8 @@ export default function DashboardScreen() {
                     justifyContent: isTabletLandscape
                       ? "space-evenly"
                       : "center",
-                    paddingTop: 4,
-                    paddingBottom: isTabletLandscape ? 10 : 0,
+                    paddingBottom: 12,
+                    marginTop: -10,
                   }}
                 >
                   <DataGrid
@@ -147,6 +145,7 @@ export default function DashboardScreen() {
             onDisconnect={actions.disconnectOBD}
             isObdStandby={state.isObdStandby}
             onOpenTerminal={() => actions.setShowTerminal(true)}
+            isLocked={state.data.l === 1}
           />
           <MainGauges
             rpm={state.data.r}
@@ -263,12 +262,13 @@ export default function DashboardScreen() {
         </Animated.View>
       )}
 
-      {/* AREA SENTUH RAHASIA OTA */}
-      <TouchableOpacity
-        activeOpacity={1}
-        style={[styles.secretZone]}
-        onPress={actions.handleSecretOtaTrigger}
-      />
+      {(state.obdStatus === "ready" || state.isBypassed) && (
+        <TouchableOpacity
+          activeOpacity={1}
+          style={[styles.secretZone]}
+          onPress={actions.handleSecretOtaTrigger}
+        />
+      )}
 
       {/* GLOBAL OVERLAY LAYER MODALS */}
       <TransmissionModal

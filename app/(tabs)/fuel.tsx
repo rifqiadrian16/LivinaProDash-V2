@@ -2,16 +2,17 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
-    Platform,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
 } from "react-native";
 import {
-    SafeAreaView,
-    useSafeAreaInsets,
+  SafeAreaView,
+  useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { useAlert } from "../../components/AlertContext";
 import { useFuelContext } from "../../components/FuelContext";
@@ -44,6 +45,10 @@ export default function FuelScreen() {
   const [history, setHistory] = useState<any[]>([]);
 
   const lifetimeCost = Math.round(parseFloat(globalTotalFuel) * fuelPrice);
+
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
+  const isPhoneLandscape = isLandscape && height < 480;
 
   const loadHistory = () => {
     if (Platform.OS === "web") {
@@ -118,8 +123,20 @@ export default function FuelScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView
+      style={[
+        styles.container,
+        { paddingHorizontal: isPhoneLandscape ? 35 : 15 },
+      ]}
+      edges={["top"]}
+    >
       <ScrollView
+        style={{
+          flex: 1,
+          marginBottom: isPhoneLandscape
+            ? insets.bottom + 40
+            : insets.bottom + 80,
+        }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >

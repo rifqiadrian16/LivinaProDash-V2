@@ -889,7 +889,8 @@ export default function TripScreen() {
           // Kalau Tablet HU & di kolom kanan, tetap bisa dibuat 2 baris (wrap) jika muat
           flexDirection: isTabletLandscape ? "row" : "column",
           flexWrap: isTabletLandscape ? "wrap" : "nowrap",
-          justifyContent: "space-between",
+          justifyContent: "center",
+          gap: 20,
         }}
       >
         {tripHistory.map((trip) => (
@@ -967,7 +968,15 @@ export default function TripScreen() {
     );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 15 }]}>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: insets.top,
+          paddingHorizontal: isPhoneLandscape ? 35 : 25,
+        },
+      ]}
+    >
       {/* HEADER LOGS (Selalu Paling Atas) */}
       <View style={[styles.headerRow, isLandscape && { marginBottom: 0 }]}>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
