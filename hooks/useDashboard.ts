@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useAlert } from "../components/AlertContext";
 import { useBLEContext } from "../components/BLEContext";
+import { useFuelContext } from "../components/FuelContext";
 import {
   getDB,
   insertNewTrip,
@@ -22,11 +23,12 @@ import {
 } from "../utils/database";
 
 const BACKGROUND_LOCATION_TASK = "LIVINA_BACKGROUND_TRACKING";
-const GLOBAL_FUEL_KEY = "@prodash_lifetime_fuel_global";
-const GLOBAL_DIST_KEY = "@prodash_lifetime_dist_global";
+const GLOBAL_AVG_FUEL_KEY = "@prodash_lifetime_avgfuel_global";
+const MOVING_SPEED_THRESHOLD = 2;
 
 export default function useDashboard() {
   const { showAlert } = useAlert();
+  const { instFuel, avgFuel } = useFuelContext();
 
   const [isHudMode, setIsHudMode] = useState(false);
   const [isNightTime, setIsNightTime] = useState(false);
@@ -40,9 +42,7 @@ export default function useDashboard() {
   const lastTapTime = useRef(0);
   const [isBypassed, setIsBypassed] = useState(false);
   const [bypassTapCount, setBypassTapCount] = useState(0);
-  const lastGlobalFuelSaveTime = useRef(Date.now());
-  const globalFuelAccumulator = useRef(0.0);
-  const globalDistAccumulator = useRef(0.0);
+  const globalAvgFuelAccumulator = useRef(0.0);
 
   const [hudTapCount, setHudTapCount] = useState(0);
   const hudTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -65,8 +65,6 @@ export default function useDashboard() {
     l: 0,
   });
   const [isRecording, setIsRecording] = useState(false);
-  const [avgFuel, setAvgFuel] = useState(0);
-  const sessionStats = useRef({ distance: 0, fuel: 0 });
 
   // const tripDataRef = useRef<any[]>([]);
   const lastUpdateTime = useRef(Date.now());
@@ -466,51 +464,6 @@ export default function useDashboard() {
     const isDFCO = newData.th < 0 && newData.s > 20 && newData.r > 1200;
     if (isDFCO) fuelFlow = 0;
 
-    // JALANKAN AKUMULASI GLOBAL SETIAP KALI DATA ECU TERHUBUNG (TANPA SYARAT RECORD ACTIVE)
-    if (dt > 0 && dt < 0.003) {
-      const frameFuelConsumption = fuelFlow * dt; // Konsumsi dalam satuan liter pada frame waktu berjalan
-
-      // 1. Akumulasi internal dashboard trip standar (seperti bawaan mas)
-      sessionStats.current.distance += newData.s * dt;
-      sessionStats.current.fuel += frameFuelConsumption;
-
-      if (sessionStats.current.fuel > 0) {
-        setAvgFuel(sessionStats.current.distance / sessionStats.current.fuel);
-      }
-
-      // 2. KUNCI UTAMA: Akumulasikan ke buffer global
-      globalFuelAccumulator.current += frameFuelConsumption;
-      globalDistAccumulator.current += newData.s * dt;
-
-      // Flush/Tembak buffer ke dalam AsyncStorage secara berkala per 5 detik demi efisiensi resource RAM
-      if (now - lastGlobalFuelSaveTime.current > 5000) {
-        lastGlobalFuelSaveTime.current = now;
-        const cachedFuelToSave = globalFuelAccumulator.current;
-        const cachedDistToSave = globalDistAccumulator.current;
-
-        globalFuelAccumulator.current = 0.0;
-        globalDistAccumulator.current = 0.0;
-
-        // Simpan Bensin
-        AsyncStorage.getItem(GLOBAL_FUEL_KEY)
-          .then((storedValue) => {
-            const currentTotal = storedValue ? parseFloat(storedValue) : 0.0;
-            const finalUpdatedTotal = currentTotal + cachedFuelToSave;
-            AsyncStorage.setItem(GLOBAL_FUEL_KEY, finalUpdatedTotal.toString());
-          })
-          .catch((e) => console.log("Gagal simpan bensin global", e));
-
-        // Simpan Jarak
-        AsyncStorage.getItem(GLOBAL_DIST_KEY)
-          .then((storedValue) => {
-            const currentTotal = storedValue ? parseFloat(storedValue) : 0.0;
-            const finalUpdatedTotal = currentTotal + cachedDistToSave;
-            AsyncStorage.setItem(GLOBAL_DIST_KEY, finalUpdatedTotal.toString());
-          })
-          .catch((e) => console.log("Gagal simpan jarak global", e));
-      }
-    }
-
     if (isRecordingRef.current) {
       if (dt > 0 && dt < 0.003) {
         runningStats.current.distance += newData.s * dt;
@@ -901,24 +854,6 @@ export default function useDashboard() {
     setHudMirrorEnabled(next);
     await AsyncStorage.setItem("@hud_mirror", next ? "1" : "0");
   };
-
-  let targetAFR = 14.7;
-  if (data.th > 50) targetAFR = 12.0;
-  else if (data.th > 30) targetAFR = 13.5;
-
-  let currentFuelFlow = (data.m / targetAFR / 740.0) * 3600.0;
-  const fuelCalibration = 1.15;
-  currentFuelFlow =
-    currentFuelFlow * (1 + (data.st + data.lt) / 100) * fuelCalibration;
-
-  const isDFCO = data.th === 0 && data.s > 20 && data.r > 1200;
-  if (isDFCO) currentFuelFlow = 0;
-
-  let instFuel = 0.0;
-  if (isDFCO) instFuel = 99.9;
-  else if (data.s > 2 && currentFuelFlow > 0)
-    instFuel = Math.min(data.s / currentFuelFlow, 99.9);
-  else instFuel = 0.0;
 
   const sendToTerminal = (cmd: string) => {
     if (!cmd.trim()) return;

@@ -27,13 +27,8 @@ import { tripStyles as styles } from "../../styles/trip.styles";
 import { getDB } from "../../utils/database";
 import { getMapHtml } from "../../utils/tripTemplates";
 
-const GLOBAL_FUEL_KEY = "@prodash_lifetime_fuel_global";
-const GLOBAL_DIST_KEY = "@prodash_lifetime_dist_global";
-
 export default function TripScreen() {
   const { showAlert, showConfirm } = useAlert();
-  const [globalAvgFuel, setGlobalAvgFuel] = useState<string>("0.0");
-  const [globalTotalFuel, setGlobalTotalFuel] = useState<string>("0.0");
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
   const [playbackIndex, setPlaybackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -48,37 +43,12 @@ export default function TripScreen() {
 
   const [tripHistory, setTripHistory] = useState<any[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [lifetimeDistance, setLifetimeDistance] = useState("0");
-  const [lifetimeAvgFuel, setLifetimeAvgFuel] = useState("0.0");
   const insets = useSafeAreaInsets();
 
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   const isTabletLandscape = isLandscape && height >= 480;
   const isPhoneLandscape = isLandscape && height < 480;
-
-  const syncGlobalStats = async () => {
-    try {
-      const savedFuel = await AsyncStorage.getItem(GLOBAL_FUEL_KEY);
-      const savedDist = await AsyncStorage.getItem(GLOBAL_DIST_KEY);
-
-      const fuel = savedFuel ? parseFloat(savedFuel) : 0;
-      const dist = savedDist ? parseFloat(savedDist) : 0;
-
-      // Format Total Fuel
-      setGlobalTotalFuel(fuel.toFixed(1)); // <-- [TAMBAHKAN INI]
-
-      // Hitung Rata-rata
-      if (fuel > 0 && dist > 0) {
-        const avg = dist / fuel;
-        setGlobalAvgFuel(avg.toFixed(1));
-      } else {
-        setGlobalAvgFuel("0.0");
-      }
-    } catch (e) {
-      console.log("Gagal memuat statistik global", e);
-    }
-  };
 
   const getTripPoints = (tripId: string) => {
     if (Platform.OS === "web") {
@@ -603,27 +573,6 @@ export default function TripScreen() {
     }
   };
 
-  const handleResetGlobalFuel = () => {
-    showConfirm(
-      "Reset Konsumsi Global",
-      "Apakah Anda yakin ingin mengosongkan rekaman total konsumsi bahan bakar aplikasi dari awal?",
-      async () => {
-        try {
-          await AsyncStorage.setItem(GLOBAL_FUEL_KEY, "0.0");
-          await AsyncStorage.setItem(GLOBAL_DIST_KEY, "0.0"); // <--- Reset jarak juga
-          setGlobalAvgFuel("0.0");
-          showAlert(
-            "BERHASIL",
-            "Data total konsumsi global telah dibersihkan kembali ke nol.",
-            "success",
-          );
-        } catch (err) {
-          showAlert("GAGAL", "Gagal mereset penyimpanan internal HP.", "error");
-        }
-      },
-    );
-  };
-
   // ===================================================================
   // FUNGSI PEMBANTU 1: ISI KOLOM KIRI (MAPS & CONTROLLER SLIDER)
   // ===================================================================
@@ -885,25 +834,13 @@ export default function TripScreen() {
         totalDist += dist;
         totalFuelLiters += fuel;
       });
-
-      setLifetimeDistance(
-        totalDist > 1000
-          ? totalDist.toLocaleString("id-ID", { maximumFractionDigits: 0 })
-          : totalDist.toFixed(1),
-      );
-
       const avg = totalFuelLiters > 0 ? totalDist / totalFuelLiters : 0;
-      setLifetimeAvgFuel(avg.toFixed(1));
-    } else {
-      setLifetimeDistance("0");
-      setLifetimeAvgFuel("0.0");
     }
   }, [tripHistory]);
 
   useFocusEffect(
     useCallback(() => {
       syncTrips();
-      syncGlobalStats();
     }, []),
   );
 
@@ -931,182 +868,6 @@ export default function TripScreen() {
       `);
     }
   }, [playbackIndex]);
-
-  const renderGlobalStatsCard = () => (
-    <View
-      style={[
-        styles.summaryCard,
-        {
-          borderColor: "#30D158",
-          borderWidth: 0.5,
-          marginBottom: isLandscape ? 0 : 15,
-          paddingTop: isPhoneLandscape ? 12 : 16,
-          paddingBottom: isPhoneLandscape ? 12 : 16,
-          paddingHorizontal: isPhoneLandscape ? 12 : 16,
-          justifyContent: "space-between",
-        },
-      ]}
-    >
-      <Text
-        style={[
-          styles.summaryTitle,
-          { color: "#30D158" },
-          isPhoneLandscape && { fontSize: 10, marginBottom: 4 },
-        ]}
-      >
-        GLOBAL ECU POWER ON CONSUMPTION
-      </Text>
-
-      {/* ======================================================= */}
-      {/* [BAGIAN BARU] KONTEN TENGAH DIBELAH JADI 2 KOLOM (ROW)    */}
-      {/* ======================================================= */}
-      <View
-        style={{
-          width: "100%",
-          flexDirection: "row",
-          justifyContent: "center",
-          alignItems: "center",
-          paddingVertical: isPhoneLandscape ? 6 : 12,
-          minHeight: isPhoneLandscape ? 50 : 70,
-        }}
-      >
-        {/* KOLOM KIRI: AVERAGE FUEL */}
-        <View style={{ flex: 1, alignItems: "center" }}>
-          <Text
-            style={[
-              styles.summaryValue,
-              {
-                color: "#FFFFFF",
-                fontWeight: "900",
-                lineHeight: isPhoneLandscape ? 30 : 40,
-                fontSize: isPhoneLandscape ? 24 : isTabletLandscape ? 34 : 32,
-              },
-            ]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-          >
-            {globalAvgFuel}
-            <Text
-              style={[
-                styles.summaryUnit,
-                {
-                  fontSize: isPhoneLandscape ? 12 : 14,
-                  color: "#aaa",
-                  fontWeight: "bold",
-                },
-              ]}
-            >
-              {" "}
-              km/L
-            </Text>
-          </Text>
-          <Text
-            style={[
-              styles.summaryLabel,
-              {
-                fontSize: isPhoneLandscape ? 9 : 10,
-                color: "#888",
-                marginTop: 2,
-              },
-            ]}
-          >
-            AVG FUEL
-          </Text>
-        </View>
-
-        {/* GARIS PEMISAH VERTIKAL TIPIS DI TENGAH */}
-        <View
-          style={{
-            width: 1,
-            height: "80%",
-            backgroundColor: "#333",
-            marginHorizontal: 10,
-          }}
-        />
-
-        {/* KOLOM KANAN: TOTAL FUEL USED */}
-        <View style={{ flex: 1, alignItems: "center" }}>
-          <Text
-            style={[
-              styles.summaryValue,
-              {
-                color: "#FFF", // Beda warna biar gampang dibedakan saat melirik
-                fontWeight: "900",
-                lineHeight: isPhoneLandscape ? 30 : 40,
-                fontSize: isPhoneLandscape ? 24 : isTabletLandscape ? 34 : 32,
-              },
-            ]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-          >
-            {globalTotalFuel}
-            <Text
-              style={[
-                styles.summaryUnit,
-                {
-                  fontSize: isPhoneLandscape ? 12 : 14,
-                  color: "#aaa",
-                  fontWeight: "bold",
-                },
-              ]}
-            >
-              {" "}
-              L
-            </Text>
-          </Text>
-          <Text
-            style={[
-              styles.summaryLabel,
-              {
-                fontSize: isPhoneLandscape ? 9 : 10,
-                color: "#888",
-                marginTop: 2,
-              },
-            ]}
-          >
-            FUEL USED
-          </Text>
-        </View>
-      </View>
-
-      {/* Garis Pemisah (Divider Mendatar) Bawah */}
-      <View
-        style={[
-          styles.summaryDivider,
-          {
-            width: "100%",
-            height: 1,
-            marginVertical: isPhoneLandscape ? 6 : 10,
-            backgroundColor: "#333",
-          },
-        ]}
-      />
-
-      {/* Tombol Reset */}
-      <TouchableOpacity
-        onPress={handleResetGlobalFuel}
-        style={{
-          flexDirection: "row",
-          width: "100%",
-          justifyContent: "center",
-          alignItems: "center",
-          paddingVertical: isPhoneLandscape ? 8 : 10,
-          backgroundColor: "rgba(255, 69, 58, 0.15)",
-          borderRadius: 8,
-          gap: 6,
-        }}
-      >
-        <Ionicons
-          name="refresh-circle"
-          size={isPhoneLandscape ? 18 : 22}
-          color="#FF453A"
-        />
-        <Text style={{ color: "#FF453A", fontSize: 11, fontWeight: "800" }}>
-          RESET GLOBAL DATA
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
 
   // ===================================================================
   // FUNGSI PEMBANTU 2: DAFTAR RECENT TRIPS
@@ -1229,7 +990,6 @@ export default function TripScreen() {
           style={styles.syncBtn}
           onPress={() => {
             syncTrips();
-            syncGlobalStats();
           }}
           disabled={isSyncing}
         >
@@ -1237,35 +997,10 @@ export default function TripScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ========================================================= */}
-      {/* KONTEN UTAMA: DIBELAH 2 JIKA LANDSCAPE, NORMAL JIKA PORTRAIT */}
-      {/* ========================================================= */}
-      {isLandscape ? (
-        /* --- MODE LANDSCAPE (HU & HP LAND): 2 KOLOM KIRI-KANAN --- */
-        <View style={{ flex: 1, flexDirection: "row", gap: 16, marginTop: 5 }}>
-          {/* KOLOM KIRI (Kecil: ~38% Lebar Layar): Khusus Global ECU */}
-          <View style={{ flex: isTabletLandscape ? 0.35 : 0.42 }}>
-            {renderGlobalStatsCard()}
-          </View>
-
-          {/* KOLOM KANAN (Sisa Ruang yang Luas: ~62%): Khusus Recent Trips */}
-          <View style={{ flex: 1 }}>
-            <Text
-              style={[styles.sectionTitle, { marginTop: 0, marginBottom: 8 }]}
-            >
-              RECENT TRIPS
-            </Text>
-            {renderRecentTrips()}
-          </View>
-        </View>
-      ) : (
-        /* --- MODE PORTRAIT (HP TEGAK): ATAS KE BAWAH --- */
-        <>
-          {renderGlobalStatsCard()}
-          <Text style={styles.sectionTitle}>RECENT TRIPS</Text>
-          {renderRecentTrips()}
-        </>
-      )}
+      <>
+        <Text style={styles.sectionTitle}>RECENT TRIPS</Text>
+        {renderRecentTrips()}
+      </>
 
       {/* ========================================================= */}
       {/* MODAL PLAYBACK TELEMETRY                                  */}
