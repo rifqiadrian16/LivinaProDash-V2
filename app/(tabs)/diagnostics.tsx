@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   AppState,
   Platform,
@@ -116,6 +117,42 @@ export default function DiagnosticsScreen() {
     return () => sub.remove();
   }, [showO2Stream, isConnected]);
 
+  // ==============================================================
+  // 5. AUTO-RESET & STOP STREAM KETIKA PINDAH TAB (UX FIX)
+  // ==============================================================
+  // Gunakan ref agar nilai state terbaru bisa dibaca di dalam cleanup unfocus
+  const isConnectedRef = useRef(isConnected);
+  isConnectedRef.current = isConnected;
+
+  const showActiveTestRef = useRef(showActiveTest);
+  showActiveTestRef.current = showActiveTest;
+
+  const showO2StreamRef = useRef(showO2Stream);
+  showO2StreamRef.current = showO2Stream;
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        // 1. Matikan Active Test jika sedang terbuka
+        if (showActiveTestRef.current) {
+          if (heartbeatTimer.current) clearInterval(heartbeatTimer.current);
+          if (autoStopTimer.current) clearTimeout(autoStopTimer.current);
+          if (isConnectedRef.current) sendMessage("ACTIVE_TEST_STOP");
+          setActiveCylinder(null);
+          setIsCylinderLocked(false);
+          setShowActiveTest(false); // Kembalikan menu ke awal
+        }
+
+        // 2. Matikan Stream O2 jika sedang terbuka
+        if (showO2StreamRef.current) {
+          if (isConnectedRef.current) sendMessage("O2_STREAM_STOP");
+          setShowO2Stream(false); // Kembalikan menu ke awal
+        }
+      };
+    }, []),
+  );
+  // ==============================================================
+
   // Logika PIN
   const handleVerifyPin = (text: string) => {
     setPinInput(text);
@@ -213,7 +250,7 @@ export default function DiagnosticsScreen() {
         style={[
           styles.container,
           {
-            paddingHorizontal: isPhoneLandscape ? 35 : 25,
+            paddingHorizontal: isPhoneLandscape ? 35 : 35,
             flex: 1,
             marginBottom: 20,
           },

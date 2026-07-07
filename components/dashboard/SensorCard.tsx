@@ -18,7 +18,7 @@ const SensorCard = memo(
               marginBottom: 6,
               paddingVertical: 9,
               paddingHorizontal: 14,
-              minHeight: 0,
+              minHeight: 44,
               flexDirection: "row",
               alignItems: "center",
             },
@@ -31,9 +31,7 @@ const SensorCard = memo(
 
           {/* KOLOM 2 (TENGAH): ANGKA (VALUE) */}
           <View style={{ flex: 1.5, alignItems: "center" }}>
-            <Text
-              style={[styles.cardValue, { fontSize: 14, marginVertical: 0 }]}
-            >
+            <Text style={[styles.cardValue, { fontSize: 14, marginTop: 0 }]}>
               {value}
             </Text>
           </View>

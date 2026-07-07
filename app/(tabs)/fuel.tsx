@@ -48,6 +48,7 @@ export default function FuelScreen() {
 
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
+  const isTabletLandscape = isLandscape && height >= 480;
   const isPhoneLandscape = isLandscape && height < 480;
 
   const loadHistory = () => {
@@ -124,10 +125,7 @@ export default function FuelScreen() {
 
   return (
     <SafeAreaView
-      style={[
-        styles.container,
-        { paddingHorizontal: isPhoneLandscape ? 35 : 15 },
-      ]}
+      style={[styles.container, isTabletLandscape && { paddingHorizontal: 25 }]}
       edges={["top"]}
     >
       <ScrollView

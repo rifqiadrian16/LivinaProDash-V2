@@ -1,10 +1,10 @@
 import { StyleSheet } from "react-native";
 
 export const fuelStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000" },
+  container: { flex: 1, backgroundColor: "#000", paddingHorizontal: 10 },
   scrollContent: { padding: 15, paddingBottom: 100 },
   headerTitle: {
-    fontSize: 26,
+    fontSize: 23,
     fontWeight: "900",
     color: "#fff",
     letterSpacing: 3,

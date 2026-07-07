@@ -14,6 +14,15 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { styles } from "../../../styles/dashboard.styles";
+import { useGaugeTheme } from "../../GaugeThemeContext";
+
+// Ikon representasi tiap bentuk gauge di daftar pilihan tema
+const LAYOUT_ICON: Record<string, any> = {
+  arc: "speedometer-outline",
+  ring: "radio-button-on-outline",
+  bar: "reorder-two-outline",
+  digital: "hardware-chip-outline",
+};
 
 export default function SettingsModal({
   visible,
@@ -48,8 +57,19 @@ export default function SettingsModal({
   const [secretTapCount, setSecretTapCount] = useState(0);
   const keyboardOffset = useRef(new Animated.Value(0)).current;
 
+  const {
+    theme: activeGaugeTheme,
+    themeIndex,
+    themes,
+    setTheme,
+  } = useGaugeTheme();
+
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
+  // ✅ Bedakan HP landscape (layar pendek) vs Tablet/Head Unit landscape,
+  // supaya modal tidak numpuk/overflow di HP yang diputar.
+  const isTabletLandscape = isLandscape && height >= 480;
+  const isPhoneLandscape = isLandscape && height < 480;
 
   // ==========================================
   // LOGIKA ANIMASI KEYBOARD: TRANSLATE Y
@@ -62,16 +82,15 @@ export default function SettingsModal({
 
     const onShow = Keyboard.addListener(showEvent, (e) => {
       Animated.timing(keyboardOffset, {
-        // Menggeser fisik kotak secara visual ke atas (Minus Y)
         toValue: -(e.endCoordinates.height / 2) - 20,
         duration: Platform.OS === "ios" ? e.duration : 200,
-        useNativeDriver: true, // Animasi diproses di GPU, dijamin super mulus!
+        useNativeDriver: true,
       }).start();
     });
 
     const onHide = Keyboard.addListener(hideEvent, (e) => {
       Animated.timing(keyboardOffset, {
-        toValue: 0, // Kembali turun ke posisi semula
+        toValue: 0,
         duration: Platform.OS === "ios" ? e.duration : 200,
         useNativeDriver: true,
       }).start();
@@ -89,17 +108,32 @@ export default function SettingsModal({
     }
   }, [visible]);
 
+  // ✅ Tinggi maksimum area scroll dihitung dinamis dari tinggi layar,
+  // bukan angka fix — supaya di HP landscape (tinggi ~360-420px) modal
+  // tidak overflow ke luar layar atau ketiban keyboard.
+  const scrollMaxHeight = isPhoneLandscape
+    ? height * 0.72
+    : isTabletLandscape
+      ? 450
+      : 800;
+
+  const sectionSpacing = isPhoneLandscape ? 12 : 20;
+  const labelFontSize = isPhoneLandscape ? 11 : 13;
+
   return (
     <>
       {/* 1. MODAL UTAMA PENGATURAN */}
       <Modal visible={visible} transparent animationType="slide">
-        {/* Background tetap diam */}
         <View style={styles.modalBg}>
-          {/* Kotak Modal ini yang akan TERBANG ke atas menghindari Keyboard */}
           <Animated.View
             style={[
               styles.modalBox,
-              { transform: [{ translateY: keyboardOffset }] }, // <--- KUNCI SIHIRNYA DI SINI
+              { transform: [{ translateY: keyboardOffset }] },
+              isPhoneLandscape && {
+                width: "94%",
+                maxWidth: 640,
+                padding: 16,
+              },
             ]}
           >
             <View
@@ -107,14 +141,21 @@ export default function SettingsModal({
                 flexDirection: "row",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: 20,
+                marginBottom: isPhoneLandscape ? 10 : 20,
               }}
             >
               <TouchableOpacity
                 activeOpacity={1}
                 onPress={() => setSecretTapCount((prev) => prev + 1)}
               >
-                <Text style={styles.modalTitle}>Pengaturan Modul</Text>
+                <Text
+                  style={[
+                    styles.modalTitle,
+                    isPhoneLandscape && { fontSize: 16 },
+                  ]}
+                >
+                  Pengaturan Modul
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity onPress={onClose}>
@@ -122,11 +163,10 @@ export default function SettingsModal({
               </TouchableOpacity>
             </View>
 
-            {/* SCROLLVIEW SUDAH MUSNAH */}
             <ScrollView
-              style={{ maxHeight: isLandscape ? 450 : 800 }} // Batasi tinggi agar bisa di-scroll di Head Unit
+              style={{ maxHeight: scrollMaxHeight }}
               contentContainerStyle={{
-                paddingBottom: 20,
+                paddingBottom: isPhoneLandscape ? 10 : 20,
                 paddingHorizontal: 2,
               }}
               showsVerticalScrollIndicator={true}
@@ -135,7 +175,7 @@ export default function SettingsModal({
               <View
                 style={{
                   flexDirection: "row",
-                  marginBottom: 20,
+                  marginBottom: sectionSpacing,
                   backgroundColor: "#000",
                   borderRadius: 10,
                 }}
@@ -145,12 +185,14 @@ export default function SettingsModal({
                   style={[
                     styles.tabBtn,
                     obdType === "bluetooth" && styles.tabActive,
+                    isPhoneLandscape && { padding: 8 },
                   ]}
                 >
                   <Text
                     style={[
                       styles.tabText,
                       obdType === "bluetooth" && { color: "#000" },
+                      isPhoneLandscape && { fontSize: 12 },
                     ]}
                   >
                     Bluetooth
@@ -161,12 +203,14 @@ export default function SettingsModal({
                   style={[
                     styles.tabBtn,
                     obdType === "wifi" && styles.tabActive,
+                    isPhoneLandscape && { padding: 8 },
                   ]}
                 >
                   <Text
                     style={[
                       styles.tabText,
                       obdType === "wifi" && { color: "#000" },
+                      isPhoneLandscape && { fontSize: 12 },
                     ]}
                   >
                     WiFi
@@ -176,13 +220,19 @@ export default function SettingsModal({
 
               {/* KONTEN TAB BLUETOOTH */}
               {obdType === "bluetooth" ? (
-                <View style={{ marginBottom: 20 }}>
-                  <Text style={styles.configLabel}>
+                <View style={{ marginBottom: sectionSpacing }}>
+                  <Text
+                    style={[styles.configLabel, { fontSize: labelFontSize }]}
+                  >
                     ALAMAT MAC ELM327 TARGET
                   </Text>
                   <View style={{ flexDirection: "row", gap: 10, marginTop: 5 }}>
                     <TextInput
-                      style={[styles.configInput, { flex: 1 }]}
+                      style={[
+                        styles.configInput,
+                        { flex: 1 },
+                        isPhoneLandscape && { padding: 10, fontSize: 13 },
+                      ]}
                       value={obdMac}
                       onChangeText={setObdMac}
                       placeholder="00:1D:A5..."
@@ -195,11 +245,23 @@ export default function SettingsModal({
                       <Ionicons name="search" size={20} color="#000" />
                     </TouchableOpacity>
                   </View>
-                  <Text style={[styles.configLabel, { marginTop: 15 }]}>
+                  <Text
+                    style={[
+                      styles.configLabel,
+                      {
+                        marginTop: isPhoneLandscape ? 10 : 15,
+                        fontSize: labelFontSize,
+                      },
+                    ]}
+                  >
                     PIN / PASSWORD BLUETOOTH
                   </Text>
                   <TextInput
-                    style={[styles.configInput, { marginTop: 5 }]}
+                    style={[
+                      styles.configInput,
+                      { marginTop: 5 },
+                      isPhoneLandscape && { padding: 10, fontSize: 13 },
+                    ]}
                     value={obdPin}
                     onChangeText={setObdPin}
                     placeholder="1234"
@@ -209,18 +271,26 @@ export default function SettingsModal({
                   />
                 </View>
               ) : (
-                <View style={{ marginBottom: 20 }}>
-                  <Text style={styles.configLabel}>NAMA WIFI OBD2 (SSID)</Text>
+                <View style={{ marginBottom: sectionSpacing }}>
+                  <Text
+                    style={[styles.configLabel, { fontSize: labelFontSize }]}
+                  >
+                    NAMA WIFI OBD2 (SSID)
+                  </Text>
                   <View
                     style={{
                       flexDirection: "row",
                       gap: 10,
                       marginTop: 5,
-                      marginBottom: 15,
+                      marginBottom: isPhoneLandscape ? 10 : 15,
                     }}
                   >
                     <TextInput
-                      style={[styles.configInput, { flex: 1 }]}
+                      style={[
+                        styles.configInput,
+                        { flex: 1 },
+                        isPhoneLandscape && { padding: 10, fontSize: 13 },
+                      ]}
                       value={obdWifiSsid}
                       onChangeText={setObdWifiSsid}
                       placeholder="WiFi_OBDII"
@@ -235,9 +305,19 @@ export default function SettingsModal({
                   </View>
                   <View style={{ flexDirection: "row", gap: 10 }}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.configLabel}>IP ADDRESS</Text>
+                      <Text
+                        style={[
+                          styles.configLabel,
+                          { fontSize: labelFontSize },
+                        ]}
+                      >
+                        IP ADDRESS
+                      </Text>
                       <TextInput
-                        style={styles.configInput}
+                        style={[
+                          styles.configInput,
+                          isPhoneLandscape && { padding: 10, fontSize: 13 },
+                        ]}
                         value={obdIp}
                         onChangeText={setObdIp}
                         placeholder="192.168.0.10"
@@ -245,9 +325,19 @@ export default function SettingsModal({
                       />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.configLabel}>PORT</Text>
+                      <Text
+                        style={[
+                          styles.configLabel,
+                          { fontSize: labelFontSize },
+                        ]}
+                      >
+                        PORT
+                      </Text>
                       <TextInput
-                        style={styles.configInput}
+                        style={[
+                          styles.configInput,
+                          isPhoneLandscape && { padding: 10, fontSize: 13 },
+                        ]}
                         value={obdPort}
                         onChangeText={setObdPort}
                         placeholder="35000"
@@ -262,11 +352,11 @@ export default function SettingsModal({
               {/* AUTO DOOR LOCK */}
               <View
                 style={{
-                  marginTop: 20,
-                  paddingTop: 20,
+                  marginTop: isPhoneLandscape ? 10 : 20,
+                  paddingTop: isPhoneLandscape ? 10 : 20,
                   borderTopWidth: 1,
                   borderTopColor: "#222",
-                  marginBottom: 20,
+                  marginBottom: sectionSpacing,
                 }}
               >
                 <View
@@ -274,11 +364,17 @@ export default function SettingsModal({
                     flexDirection: "row",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    marginBottom: 15,
+                    marginBottom: isPhoneLandscape ? 8 : 15,
                   }}
                 >
                   <View>
-                    <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                    <Text
+                      style={{
+                        color: "#fff",
+                        fontWeight: "bold",
+                        fontSize: isPhoneLandscape ? 13 : 14,
+                      }}
+                    >
                       Auto Door Lock
                     </Text>
                     <Text style={{ color: "#666", fontSize: 10 }}>
@@ -311,14 +407,20 @@ export default function SettingsModal({
                 </View>
                 {autoLock && (
                   <View>
-                    <Text style={styles.configLabel}>
+                    <Text
+                      style={[styles.configLabel, { fontSize: labelFontSize }]}
+                    >
                       KUNCI PADA KECEPATAN (KM/H)
                     </Text>
                     <View
                       style={{ flexDirection: "row", gap: 10, marginTop: 5 }}
                     >
                       <TextInput
-                        style={[styles.configInput, { flex: 1 }]}
+                        style={[
+                          styles.configInput,
+                          { flex: 1 },
+                          isPhoneLandscape && { padding: 10, fontSize: 13 },
+                        ]}
                         value={lockSpeed}
                         onChangeText={(val) => {
                           setLockSpeed(val);
@@ -343,8 +445,8 @@ export default function SettingsModal({
                 style={{
                   borderTopWidth: 1,
                   borderTopColor: "#222",
-                  paddingTop: 20,
-                  marginBottom: 20,
+                  paddingTop: isPhoneLandscape ? 10 : 20,
+                  marginBottom: sectionSpacing,
                 }}
               >
                 <View
@@ -355,7 +457,13 @@ export default function SettingsModal({
                   }}
                 >
                   <View style={{ flex: 1, marginRight: 10 }}>
-                    <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                    <Text
+                      style={{
+                        color: "#fff",
+                        fontWeight: "bold",
+                        fontSize: isPhoneLandscape ? 13 : 14,
+                      }}
+                    >
                       Mode Tampilan HUD
                     </Text>
                     <Text style={{ color: "#666", fontSize: 10 }}>
@@ -386,8 +494,108 @@ export default function SettingsModal({
                 </View>
               </View>
 
-              <TouchableOpacity style={styles.saveBtn} onPress={onApply}>
-                <Text style={styles.saveBtnText}>TERAPKAN & RESTART MODUL</Text>
+              {/* ✅ TEMA GAUGE (Bentuk + Warna RPM & Speed) */}
+              <View
+                style={{
+                  borderTopWidth: 1,
+                  borderTopColor: "#222",
+                  paddingTop: isPhoneLandscape ? 10 : 20,
+                  marginBottom: sectionSpacing,
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#fff",
+                    fontWeight: "bold",
+                    marginBottom: 4,
+                    fontSize: isPhoneLandscape ? 13 : 14,
+                  }}
+                >
+                  Tema Gauge
+                </Text>
+                <Text
+                  style={{
+                    color: "#666",
+                    fontSize: 10,
+                    marginBottom: isPhoneLandscape ? 8 : 12,
+                  }}
+                >
+                  Ganti bentuk & warna gauge RPM/Speed di dashboard & HUD.
+                </Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: 8,
+                  }}
+                >
+                  {themes.map((t: any, idx: number) => (
+                    <TouchableOpacity
+                      key={t.id}
+                      onPress={() => setTheme(idx)}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: isPhoneLandscape ? 6 : 8,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: themeIndex === idx ? t.rpmColor : "#333",
+                        backgroundColor:
+                          themeIndex === idx ? "#1a1a1a" : "#000",
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <Ionicons
+                        name={LAYOUT_ICON[t.layout] || "apps-outline"}
+                        size={14}
+                        color={themeIndex === idx ? t.rpmColor : "#666"}
+                      />
+                      <View
+                        style={{
+                          width: 9,
+                          height: 9,
+                          borderRadius: 5,
+                          backgroundColor: t.rpmColor,
+                        }}
+                      />
+                      <View
+                        style={{
+                          width: 9,
+                          height: 9,
+                          borderRadius: 5,
+                          backgroundColor: t.speedColor,
+                        }}
+                      />
+                      <Text
+                        style={{
+                          color: themeIndex === idx ? "#fff" : "#888",
+                          fontSize: 11,
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {t.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.saveBtn,
+                  isPhoneLandscape && { paddingVertical: 12 },
+                ]}
+                onPress={onApply}
+              >
+                <Text
+                  style={[
+                    styles.saveBtnText,
+                    isPhoneLandscape && { fontSize: 12 },
+                  ]}
+                >
+                  TERAPKAN & RESTART MODUL
+                </Text>
               </TouchableOpacity>
 
               {secretTapCount >= 7 && (
@@ -422,16 +630,28 @@ export default function SettingsModal({
       {/* 2. MODAL LAPISAN KEDUA: RADAR SCANNER */}
       <Modal visible={showScanner} transparent animationType="fade">
         <View style={[styles.modalBg, { backgroundColor: "rgba(0,0,0,0.9)" }]}>
-          <View style={[styles.modalBox, { borderColor: "#00ff88" }]}>
+          <View
+            style={[
+              styles.modalBox,
+              { borderColor: "#00ff88" },
+              isPhoneLandscape && { width: "90%", maxWidth: 520, padding: 16 },
+            ]}
+          >
             <View
               style={{
                 flexDirection: "row",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: 20,
+                marginBottom: isPhoneLandscape ? 10 : 20,
               }}
             >
-              <Text style={[styles.modalTitle, { color: "#00ff88" }]}>
+              <Text
+                style={[
+                  styles.modalTitle,
+                  { color: "#00ff88" },
+                  isPhoneLandscape && { fontSize: 16 },
+                ]}
+              >
                 Radar OBD2
               </Text>
               <TouchableOpacity onPress={() => setShowScanner(false)}>
@@ -440,7 +660,12 @@ export default function SettingsModal({
             </View>
 
             {isSearchingOBD ? (
-              <View style={{ alignItems: "center", paddingVertical: 30 }}>
+              <View
+                style={{
+                  alignItems: "center",
+                  paddingVertical: isPhoneLandscape ? 14 : 30,
+                }}
+              >
                 <ActivityIndicator size="large" color="#00ff88" />
                 <Text
                   style={{
@@ -453,9 +678,14 @@ export default function SettingsModal({
                 </Text>
               </View>
             ) : (
-              // SCROLLVIEW DIHAPUS, DIGANTI VIEW BIASA
               <ScrollView
-                style={{ maxHeight: isLandscape ? 140 : 250 }}
+                style={{
+                  maxHeight: isPhoneLandscape
+                    ? height * 0.45
+                    : isTabletLandscape
+                      ? 140
+                      : 250,
+                }}
                 showsVerticalScrollIndicator={true}
                 nestedScrollEnabled={true}
               >

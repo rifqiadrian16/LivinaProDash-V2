@@ -7,7 +7,7 @@ export const tripStyles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 10,
   },
   headerTitle: {
     fontSize: 26,
@@ -62,13 +62,11 @@ export const tripStyles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 15,
     letterSpacing: 1,
-    marginTop: 10,
   },
   tripCard: {
     backgroundColor: "#1e1e1e",
     padding: 15,
     borderRadius: 12,
-    marginBottom: 12,
   },
   tripHeader: {
     flexDirection: "row",

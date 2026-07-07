@@ -57,11 +57,12 @@ export default function DashboardScreen() {
       // tidak disentuh sama sekali.
       // ====================================================
       if (isLandscape) {
+        const horizontalPadding = isTabletLandscape ? 35 : 8;
         return (
           // BUNGKUSAN UTAMA: Mengatur urutan dari Atas ke Bawah
           <View style={{ flex: 1, paddingTop: 8 }}>
             {/* 1. HEADER AREA (FULL WIDTH) */}
-            <View style={[{ paddingHorizontal: 16, paddingBottom: 0 }]}>
+            <View style={{ paddingHorizontal: horizontalPadding }}>
               <DashboardHeader
                 isConnected={state.isConnected}
                 isNightTime={state.isNightTime}
@@ -79,6 +80,7 @@ export default function DashboardScreen() {
               style={{
                 flex: 1,
                 flexDirection: "row",
+                paddingHorizontal: horizontalPadding,
                 // Beri jarak di bawah agar tidak tertutup Tab Bar melayang (Tab Bar = ~64px)
                 paddingBottom: bottomReserve,
               }}
