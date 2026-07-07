@@ -270,6 +270,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useGearRatio } from "../../hooks/useGearRatio";
@@ -292,6 +293,7 @@ const speedTicks = [0, 40, 80, 120, 160, 200];
 const MainGauges = memo(
   ({ speed = 0, rpm = 0, transmission = "matic" }: MainGaugesProps) => {
     const { theme, cycleTheme } = useGaugeTheme();
+    const { width: screenWidth } = useWindowDimensions();
 
     const [animRpm, setAnimRpm] = useState(rpm);
     const [animSpeed, setAnimSpeed] = useState(speed);
@@ -322,11 +324,29 @@ const MainGauges = memo(
 
     const estimatedGear = useGearRatio(animRpm, animSpeed, transmission);
 
-    // Arc & Ring butuh basis "radius" (lingkaran); Bar & Digital pakai
-    // basis lebar panel yang beda proporsinya.
-    const isArcOrRing = theme.layout === "arc" || theme.layout === "ring";
-    const primaryRadius = isArcOrRing ? 130 : 115;
-    const secondaryRadius = isArcOrRing ? 100 : 100;
+    // ✅ CLASSIC ARC: cuma 1 gauge (RPM). Speed cukup jadi angka kecil DI
+    // DALAM gauge (insetValue) — bukan gauge arc kedua yang numpuk ke bawah.
+    const isArc = theme.layout === "arc";
+    // ✅ FULL RING: disejajarkan kiri-kanan (kayak landscape), BUKAN ditumpuk.
+    const isSideBySide = theme.layout === "ring";
+    const isArcOrRing = isArc || isSideBySide;
+
+    // Radius dasar per tipe gauge. Untuk BAR & DIGITAL sengaja DISAMAKAN
+    // (primary = secondary) supaya lebar kotak Speed = lebar kotak RPM.
+    let primaryRadius = isArcOrRing ? 130 : 115;
+    let secondaryRadius = isArcOrRing ? 100 : 115;
+
+    if (isSideBySide) {
+      // Ring portrait disejajarkan -> radius dihitung dari lebar layar
+      // supaya 2 lingkaran muat berdampingan (container padding ±20px kiri-kanan).
+      const availableWidth = screenWidth - 40 - 16;
+      const ringRadius = Math.max(
+        58,
+        Math.min((availableWidth / 2 - 24) / 2, 105),
+      );
+      primaryRadius = ringRadius;
+      secondaryRadius = ringRadius;
+    }
 
     return (
       <View style={styles.container}>
@@ -334,38 +354,91 @@ const MainGauges = memo(
           <Text style={styles.gearText}>{estimatedGear}</Text>
         </View>
 
-        <GaugeUnit
-          value={animRpm}
-          max={MAX_RPM}
-          redlineFrom={REDLINE_RPM}
-          tickValues={rpmTicks}
-          unitLabel="RPM"
-          title="ENGINE"
-          color={theme.rpmColor}
-          needleColor={theme.rpmNeedle}
-          radius={primaryRadius}
-          layout={theme.layout}
-          glow={theme.glow}
-          grid={theme.grid}
-          fontFamily={theme.fontFamily}
-        />
-
-        <View style={{ marginTop: theme.layout === "digital" ? 14 : 8 }}>
+        {isArc ? (
           <GaugeUnit
-            value={animSpeed}
-            max={MAX_SPEED}
-            tickValues={speedTicks}
-            unitLabel="KM/H"
-            title="SPEED"
-            color={theme.speedColor}
-            needleColor={theme.speedNeedle}
-            radius={secondaryRadius}
+            value={animRpm}
+            max={MAX_RPM}
+            redlineFrom={REDLINE_RPM}
+            tickValues={rpmTicks}
+            unitLabel="RPM"
+            title="ENGINE"
+            color={theme.rpmColor}
+            needleColor={theme.rpmNeedle}
+            radius={primaryRadius}
             layout={theme.layout}
             glow={theme.glow}
             grid={theme.grid}
             fontFamily={theme.fontFamily}
+            insetValue={Math.round(animSpeed)}
+            insetUnit=""
           />
-        </View>
+        ) : isSideBySide ? (
+          <View style={styles.sideBySideRow}>
+            <GaugeUnit
+              value={animRpm}
+              max={MAX_RPM}
+              redlineFrom={REDLINE_RPM}
+              tickValues={rpmTicks}
+              unitLabel="RPM"
+              title="ENGINE"
+              color={theme.rpmColor}
+              needleColor={theme.rpmNeedle}
+              radius={primaryRadius}
+              layout={theme.layout}
+              glow={theme.glow}
+              grid={theme.grid}
+              fontFamily={theme.fontFamily}
+            />
+            <GaugeUnit
+              value={animSpeed}
+              max={MAX_SPEED}
+              tickValues={speedTicks}
+              unitLabel="KM/H"
+              title="SPEED"
+              color={theme.speedColor}
+              needleColor={theme.speedNeedle}
+              radius={secondaryRadius}
+              layout={theme.layout}
+              glow={theme.glow}
+              grid={theme.grid}
+              fontFamily={theme.fontFamily}
+            />
+          </View>
+        ) : (
+          <>
+            <GaugeUnit
+              value={animRpm}
+              max={MAX_RPM}
+              redlineFrom={REDLINE_RPM}
+              tickValues={rpmTicks}
+              unitLabel="RPM"
+              title="ENGINE"
+              color={theme.rpmColor}
+              needleColor={theme.rpmNeedle}
+              radius={primaryRadius}
+              layout={theme.layout}
+              glow={theme.glow}
+              grid={theme.grid}
+              fontFamily={theme.fontFamily}
+            />
+            <View style={{ marginTop: theme.layout === "digital" ? 14 : 8 }}>
+              <GaugeUnit
+                value={animSpeed}
+                max={MAX_SPEED}
+                tickValues={speedTicks}
+                unitLabel="KM/H"
+                title="SPEED"
+                color={theme.speedColor}
+                needleColor={theme.speedNeedle}
+                radius={secondaryRadius}
+                layout={theme.layout}
+                glow={theme.glow}
+                grid={theme.grid}
+                fontFamily={theme.fontFamily}
+              />
+            </View>
+          </>
+        )}
 
         {/* ✅ Tap buat cycle tema (bentuk + warna sekaligus) */}
         <TouchableOpacity
@@ -391,6 +464,13 @@ const styles = StyleSheet.create({
     paddingTop: 22,
     position: "relative",
   },
+  sideBySideRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "flex-start",
+    gap: 16,
+    width: "100%",
+  },
   themeToggleBtn: {
     position: "absolute",
     top: 4,
@@ -399,7 +479,7 @@ const styles = StyleSheet.create({
   },
   gearContainer: {
     position: "absolute",
-    top: 0,
+    top: -13,
     backgroundColor: "rgba(15, 15, 15, 0.8)",
     paddingHorizontal: 16,
     paddingVertical: 4,

@@ -419,6 +419,11 @@ const LandscapeGauges = memo(
     const { width: screenWidth, height: screenHeight } = useWindowDimensions();
     const { theme, cycleTheme } = useGaugeTheme();
 
+    // ✅ Sama seperti komponen lain: >=480 tinggi dianggap Tablet/Head Unit,
+    // dipakai supaya Bar & Digital bisa punya cap radius yang jauh lebih
+    // besar di Tablet dibanding HP (sebelumnya disamakan, jadi HU kekecilan).
+    const isTabletLandscapeGauge = screenHeight >= 480;
+
     const [animRpm, setAnimRpm] = useState(rpm);
     const [animSpeed, setAnimSpeed] = useState(speed);
     const rpmValue = useRef(new Animated.Value(rpm)).current;
@@ -448,21 +453,30 @@ const LandscapeGauges = memo(
 
     const estimatedGear = useGearRatio(animRpm, animSpeed, transmission);
 
-    const availableWidthForBothGauges = screenWidth / 2 - 16 - 8;
+    const isArc = theme.layout === "arc";
+    const isRing = theme.layout === "ring";
+    const isArcOrRing = isArc || isRing;
+    const isColumnLayout = !isArcOrRing; // bar & digital
+
+    const availableWidthForGauges = screenWidth / 2 - 16 - 8;
     const availableHeight = screenHeight - 70 - 90 - 40;
-    const isArcOrRing = theme.layout === "arc" || theme.layout === "ring";
 
     let radius: number;
     if (isArcOrRing) {
-      const radiusFromWidth = (availableWidthForBothGauges / 2 - 40) / 2;
+      const radiusFromWidth = (availableWidthForGauges / 2 - 40) / 2;
       const radiusFromHeight = (availableHeight - 10) / 2 / 0.62 - 20;
       radius = Math.min(radiusFromWidth, radiusFromHeight);
       radius = Math.max(56, Math.min(radius, 155));
     } else {
-      // Bar & Digital pakai basis lebar panel (radius*2.2 = lebar panel)
+      // ✅ FIX: Bar/Digital kolom pakai basis LEBAR PENUH kolom kiri
+      // (bukan dibagi 2 lagi, karena cuma 1 panel per baris), dengan
+      // faktor lebih besar & cap terpisah HP vs Tablet supaya ngisi
+      // ruang yang tersedia, bukan nyisa space kosong di kanan-kiri.
+      const widthFactor = isTabletLandscapeGauge ? 0.95 : 0.92;
+      const maxCap = isTabletLandscapeGauge ? 230 : 155;
       radius = Math.max(
-        70,
-        Math.min(availableWidthForBothGauges / 2 / 2.2, 130),
+        90,
+        Math.min((availableWidthForGauges * widthFactor) / 2.2, maxCap),
       );
     }
 
@@ -472,15 +486,29 @@ const LandscapeGauges = memo(
       (_, i) => i * SPEED_TICK_STEP,
     );
 
+    const rpmMarginStyle = isArc ? { marginRight: -16 } : undefined;
+    const speedMarginStyle = isArc ? { marginLeft: -16 } : undefined;
+
     return (
       <View style={styles.wrapper}>
-        <View style={styles.gearBadgeSlot} pointerEvents="none">
+        {/* ✅ FIX: gear badge dikasih jarak LEBIH JAUH ke atas khusus saat
+        layout kolom (Bar/Digital), supaya tidak menutupi bagian atas
+        panel LCD/Bar. Row layout (Arc/Ring) tetap seperti semula. */}
+        <View
+          style={[styles.gearBadgeSlot, isColumnLayout && { top: -34 }]}
+          pointerEvents="none"
+        >
           <View style={styles.gearBadge}>
             <Text style={styles.gearBadgeText}>{estimatedGear}</Text>
           </View>
         </View>
 
-        <View style={[styles.row, !isArcOrRing && { gap: 16 }]}>
+        <View
+          style={[
+            isColumnLayout ? styles.column : styles.row,
+            isRing && { gap: 10 },
+          ]}
+        >
           <GaugeUnit
             value={animRpm}
             max={MAX_RPM}
@@ -495,7 +523,7 @@ const LandscapeGauges = memo(
             glow={theme.glow}
             grid={theme.grid}
             fontFamily={theme.fontFamily}
-            style={isArcOrRing ? { marginRight: -16 } : undefined}
+            style={rpmMarginStyle}
           />
           <GaugeUnit
             value={animSpeed}
@@ -510,14 +538,20 @@ const LandscapeGauges = memo(
             glow={theme.glow}
             grid={theme.grid}
             fontFamily={theme.fontFamily}
-            style={isArcOrRing ? { marginLeft: -16 } : undefined}
+            style={speedMarginStyle}
           />
         </View>
 
         {/* ✅ Tap buat cycle tema (bentuk + warna sekaligus) */}
         <TouchableOpacity
           onPress={cycleTheme}
-          style={styles.themeToggleBtn}
+          style={[
+            styles.themeToggleBtn,
+            // ✅ Untuk layout kolom (Bar/Digital), pindahkan ke pojok KANAN BAWAH
+            // wrapper — nggak ketiban gear badge di atas & nggak nempel ke tepi
+            // panel RPM/Speed yang sekarang lebih lebar (full-width kolom).
+            isColumnLayout && styles.themeToggleBtnColumn,
+          ]}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Ionicons name="color-palette-outline" size={14} color="#555" />
@@ -543,7 +577,18 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 0,
   },
+  column: {
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 10,
+  },
   themeToggleBtn: { position: "absolute", top: -6, right: -6, padding: 6 },
+  themeToggleBtnColumn: {
+    top: -20,
+    right: -6,
+    bottom: -8,
+  },
   gearBadge: {
     backgroundColor: "rgba(15, 15, 15, 0.9)",
     paddingHorizontal: 14,

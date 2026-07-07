@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useKeepAwake } from "expo-keep-awake";
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -44,6 +44,50 @@ export default function DashboardScreen() {
   const isTabletLandscape = isLandscape && height >= 480;
   const bottomReserve = isLandscape ? 55 : 85;
   const insets = useSafeAreaInsets();
+
+  const [isGaugeTestMode, setIsGaugeTestMode] = useState(false);
+  const [testRpm, setTestRpm] = useState(0);
+  const [testSpeed, setTestSpeed] = useState(0);
+  const testDirRef = useRef(1); // 1 = naik, -1 = turun
+  const testIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (isGaugeTestMode) {
+      testIntervalRef.current = setInterval(() => {
+        setTestRpm((prev) => {
+          let next = prev + testDirRef.current * 140;
+          if (next >= 8000) {
+            next = 8000;
+            testDirRef.current = -1;
+          }
+          if (next <= 0) {
+            next = 0;
+            testDirRef.current = 1;
+          }
+          return next;
+        });
+        setTestSpeed((prev) => {
+          let next = prev + testDirRef.current * 3.8;
+          if (next >= 220) next = 220;
+          if (next <= 0) next = 0;
+          return next;
+        });
+      }, 50);
+    } else {
+      if (testIntervalRef.current) clearInterval(testIntervalRef.current);
+      setTestRpm(0);
+      setTestSpeed(0);
+      testDirRef.current = 1;
+    }
+    return () => {
+      if (testIntervalRef.current) clearInterval(testIntervalRef.current);
+    };
+  }, [isGaugeTestMode]);
+
+  // Nilai yang benar-benar dikirim ke gauge: pakai data simulasi kalau test
+  // mode aktif, kalau tidak pakai data asli dari ECU seperti biasa.
+  const gaugeRpm = isGaugeTestMode ? testRpm : state.data.r;
+  const gaugeSpeed = isGaugeTestMode ? testSpeed : state.data.s;
 
   // 🛡️ GERBANG LOGIKA TAMPILAN DINAMIS
   const renderMainContent = () => {
@@ -95,8 +139,8 @@ export default function DashboardScreen() {
                 }}
               >
                 <LandscapeGauges
-                  rpm={state.data.r}
-                  speed={state.data.s}
+                  rpm={gaugeRpm}
+                  speed={gaugeSpeed}
                   transmission={state.transmission || "matic"}
                 />
               </View>
@@ -150,8 +194,8 @@ export default function DashboardScreen() {
             isLocked={state.data.l === 1}
           />
           <MainGauges
-            rpm={state.data.r}
-            speed={state.data.s}
+            rpm={gaugeRpm}
+            speed={gaugeSpeed}
             transmission={state.transmission || "matic"}
           />
           <DataGrid
@@ -270,6 +314,36 @@ export default function DashboardScreen() {
           style={[styles.secretZone]}
           onPress={actions.handleSecretOtaTrigger}
         />
+      )}
+
+      {(state.obdStatus === "ready" || state.isBypassed) && (
+        <TouchableOpacity
+          onPress={() => setIsGaugeTestMode((prev) => !prev)}
+          style={{
+            position: "absolute",
+            top: insets.top + 8,
+            alignSelf: "center",
+            backgroundColor: isGaugeTestMode ? "#ff4444" : "#222",
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: isGaugeTestMode ? "#ff8888" : "#444",
+            zIndex: 999,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          <Ionicons
+            name={isGaugeTestMode ? "stop-circle" : "play-circle"}
+            size={16}
+            color="#fff"
+          />
+          <Text style={{ color: "#fff", fontWeight: "900", fontSize: 11 }}>
+            {isGaugeTestMode ? "STOP TEST REV" : "TEST REV"}
+          </Text>
+        </TouchableOpacity>
       )}
 
       {/* GLOBAL OVERLAY LAYER MODALS */}

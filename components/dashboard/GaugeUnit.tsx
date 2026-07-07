@@ -11,6 +11,7 @@ import Svg, {
 import { GaugeLayout } from "../../constants/gaugeThemes";
 
 const REDLINE_COLOR = "#FF3B30";
+const TICK_LABEL_WIDTH = 22;
 
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
   const rad = ((angleDeg - 90) * Math.PI) / 180;
@@ -39,12 +40,16 @@ interface GaugeUnitProps {
   title: string;
   color: string;
   needleColor: string;
-  radius: number; // ukuran dasar (basis untuk semua layout, bukan cuma lingkaran)
+  radius: number;
   layout: GaugeLayout;
   glow?: boolean;
   grid?: boolean;
   fontFamily?: string;
   style?: any;
+  // TAMBAHAN: dipakai khusus mode "arc" gabungan (Classic Arc portrait) —
+  // menampilkan angka kecil (mis. Speed) di dalam gauge, tanpa gauge kedua.
+  insetValue?: number | string;
+  insetUnit?: string;
 }
 
 const GaugeUnit = memo(
@@ -64,6 +69,8 @@ const GaugeUnit = memo(
     grid = false,
     fontFamily,
     style,
+    insetValue,
+    insetUnit,
   }: GaugeUnitProps) => {
     const safeValue = Math.min(Math.max(value, 0), max);
     const isRedline = redlineFrom !== undefined && value >= redlineFrom;
@@ -92,7 +99,7 @@ const GaugeUnit = memo(
 
       return (
         <View style={[styles.cluster, style]}>
-          <Svg width={size} height={size * 0.62 + 10}>
+          <Svg width={size} height={size / 2 + 26}>
             {tickValues.map((t, i) => {
               const rot = startAngle + (t / max) * sweepAngle;
               const isRedZone = redlineFrom !== undefined && t >= redlineFrom;
@@ -178,6 +185,24 @@ const GaugeUnit = memo(
               />
               <Circle cx={cx} cy={cy} r={2} fill="#000" />
             </G>
+
+            {/* ✅ TAMBAHAN: angka kecil (mis. Speed) di ruang kosong bawah
+            pivot jarum — jarum semi-circle ini hanya menyapu bagian ATAS
+            (angle -90..+90 dari titik atas), jadi area bawah pivot aman
+            dipakai untuk insert digital kecil tanpa ketiban jarum. */}
+            {insetValue !== undefined && insetValue !== null && (
+              <SvgText
+                x={cx}
+                y={cy - radius * 0.32}
+                fill="#eeeeee"
+                fontSize={40}
+                fontWeight="900"
+                textAnchor="middle"
+              >
+                {insetValue}
+                {insetUnit ? ` ${insetUnit}` : ""}
+              </SvgText>
+            )}
           </Svg>
           <View style={styles.valueBlock}>
             <Text
@@ -309,12 +334,34 @@ const GaugeUnit = memo(
               ]}
             />
           </View>
-          <View style={styles.barTicksRow}>
-            {tickValues.map((t, i) => (
-              <Text key={i} style={styles.barTickText}>
-                {t >= 1000 ? t / 1000 : t}
-              </Text>
-            ))}
+          {/* ✅ FIX: tiap label tick dikasih flex:1 + alignment kiri/tengah/
+          kanan sesuai posisinya, supaya "0 1 2 3 4 5 6 7 8" sejajar rapi
+          dengan track di bawahnya dan angka ujung tidak kepotong/mepet. */}
+          <View style={[styles.barTicksRow, { width: barWidth }]}>
+            {tickValues.map((t, i) => {
+              const pct = t / max;
+              const rawLeft = pct * barWidth - TICK_LABEL_WIDTH / 2;
+              const clampedLeft = Math.max(
+                0,
+                Math.min(rawLeft, barWidth - TICK_LABEL_WIDTH),
+              );
+              return (
+                <Text
+                  key={i}
+                  style={[
+                    styles.barTickText,
+                    {
+                      position: "absolute",
+                      left: clampedLeft,
+                      width: TICK_LABEL_WIDTH,
+                      textAlign: "center",
+                    },
+                  ]}
+                >
+                  {t >= 1000 ? t / 1000 : t}
+                </Text>
+              );
+            })}
           </View>
         </View>
       );
@@ -387,7 +434,7 @@ export default GaugeUnit;
 
 const styles = StyleSheet.create({
   cluster: { alignItems: "center" },
-  valueBlock: { alignItems: "center", marginTop: 4 },
+  valueBlock: { alignItems: "center", marginTop: -4 },
   valueDigits: {
     fontSize: 36,
     fontWeight: "200",
@@ -446,8 +493,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,59,48,0.15)",
   },
   barTicksRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    position: "relative",
+    height: 12,
     marginTop: 4,
   },
   barTickText: { fontSize: 8, color: "#444", fontWeight: "bold" },
