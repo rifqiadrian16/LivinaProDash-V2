@@ -430,14 +430,17 @@ const LandscapeGauges = memo(
     const speedValue = useRef(new Animated.Value(speed)).current;
 
     useEffect(() => {
-      Animated.timing(rpmValue, {
+      Animated.spring(rpmValue, {
         toValue: rpm,
-        duration: 250,
+        friction: 7, // Redaman (makin kecil angkanya, makin memantul)
+        tension: 45, // Tarikan gas (makin besar, makin cepat dan responsif)
         useNativeDriver: false,
       }).start();
-      Animated.timing(speedValue, {
+
+      Animated.spring(speedValue, {
         toValue: speed,
-        duration: 250,
+        friction: 7,
+        tension: 45,
         useNativeDriver: false,
       }).start();
     }, [rpm, speed]);
@@ -495,7 +498,11 @@ const LandscapeGauges = memo(
         layout kolom (Bar/Digital), supaya tidak menutupi bagian atas
         panel LCD/Bar. Row layout (Arc/Ring) tetap seperti semula. */}
         <View
-          style={[styles.gearBadgeSlot, isColumnLayout && { top: -34 }]}
+          style={[
+            styles.gearBadgeSlot,
+            // Naikkan posisi Gear Badge lebih tinggi khusus di Tablet
+            isColumnLayout && { top: isTabletLandscapeGauge ? -60 : -34 },
+          ]}
           pointerEvents="none"
         >
           <View style={styles.gearBadge}>
@@ -507,6 +514,10 @@ const LandscapeGauges = memo(
           style={[
             isColumnLayout ? styles.column : styles.row,
             isRing && { gap: 10 },
+            theme.layout === "bar" && { gap: isTabletLandscapeGauge ? 80 : 20 },
+            theme.layout === "digital" && {
+              gap: isTabletLandscapeGauge ? 35 : 20,
+            },
           ]}
         >
           <GaugeUnit

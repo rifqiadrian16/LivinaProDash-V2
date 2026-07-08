@@ -112,10 +112,10 @@ export default function SettingsModal({
   // bukan angka fix — supaya di HP landscape (tinggi ~360-420px) modal
   // tidak overflow ke luar layar atau ketiban keyboard.
   const scrollMaxHeight = isPhoneLandscape
-    ? height * 0.72
+    ? height * 0.65
     : isTabletLandscape
       ? 450
-      : 800;
+      : 650;
 
   const sectionSpacing = isPhoneLandscape ? 12 : 20;
   const labelFontSize = isPhoneLandscape ? 11 : 13;

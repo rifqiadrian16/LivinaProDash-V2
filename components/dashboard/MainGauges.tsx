@@ -301,14 +301,17 @@ const MainGauges = memo(
     const speedValue = useRef(new Animated.Value(speed)).current;
 
     useEffect(() => {
-      Animated.timing(rpmValue, {
+      Animated.spring(rpmValue, {
         toValue: rpm,
-        duration: 250,
+        friction: 7, // Redaman (makin kecil angkanya, makin memantul)
+        tension: 45, // Tarikan gas (makin besar, makin cepat dan responsif)
         useNativeDriver: false,
       }).start();
-      Animated.timing(speedValue, {
+
+      Animated.spring(speedValue, {
         toValue: speed,
-        duration: 250,
+        friction: 7,
+        tension: 45,
         useNativeDriver: false,
       }).start();
     }, [rpm, speed]);
@@ -333,8 +336,8 @@ const MainGauges = memo(
 
     // Radius dasar per tipe gauge. Untuk BAR & DIGITAL sengaja DISAMAKAN
     // (primary = secondary) supaya lebar kotak Speed = lebar kotak RPM.
-    let primaryRadius = isArcOrRing ? 130 : 115;
-    let secondaryRadius = isArcOrRing ? 100 : 115;
+    let primaryRadius = isArcOrRing ? 130 : 170;
+    let secondaryRadius = isArcOrRing ? 100 : 170;
 
     if (isSideBySide) {
       // Ring portrait disejajarkan -> radius dihitung dari lebar layar
@@ -355,23 +358,112 @@ const MainGauges = memo(
         </View>
 
         {isArc ? (
-          <GaugeUnit
-            value={animRpm}
-            max={MAX_RPM}
-            redlineFrom={REDLINE_RPM}
-            tickValues={rpmTicks}
-            unitLabel="RPM"
-            title="ENGINE"
-            color={theme.rpmColor}
-            needleColor={theme.rpmNeedle}
-            radius={primaryRadius}
-            layout={theme.layout}
-            glow={theme.glow}
-            grid={theme.grid}
-            fontFamily={theme.fontFamily}
-            insetValue={Math.round(animSpeed)}
-            insetUnit=""
-          />
+          <View style={{ alignItems: "center" }}>
+            <GaugeUnit
+              value={animRpm}
+              max={MAX_RPM}
+              redlineFrom={REDLINE_RPM}
+              tickValues={rpmTicks}
+              unitLabel="RPM"
+              title=""
+              color={theme.rpmColor}
+              needleColor={theme.rpmNeedle}
+              radius={primaryRadius}
+              layout={theme.layout}
+              glow={theme.glow}
+              grid={theme.grid}
+              fontFamily={theme.fontFamily}
+            />
+
+            {/* 👇 GANTI MULAI DARI SINI 👇 */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "center", // <-- Posisikan di tengah
+                alignItems: "center",
+                gap: 60, // <-- Jarak proporsional antara RPM dan Speed
+                width: primaryRadius * 2 + 40,
+                marginTop: -20,
+              }}
+            >
+              {/* KIRI: Blok RPM */}
+              <View style={{ alignItems: "center" }}>
+                <Text
+                  style={{
+                    fontSize: 36,
+                    fontWeight: "200",
+                    color: animRpm >= REDLINE_RPM ? "#FF3B30" : "#ffffff",
+                    fontVariant: ["tabular-nums"],
+                    lineHeight: 40,
+                    letterSpacing: -1.5,
+                  }}
+                >
+                  {rpm.toLocaleString("id-ID")}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: "700",
+                    color: "#888",
+                    letterSpacing: 2,
+                    marginTop: 2,
+                  }}
+                >
+                  RPM
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 9,
+                    fontWeight: "800",
+                    color: "#555",
+                    letterSpacing: 3,
+                    marginTop: 2,
+                  }}
+                >
+                  ENGINE
+                </Text>
+              </View>
+
+              {/* KANAN: Blok Speed */}
+              <View style={{ alignItems: "center" }}>
+                <Text
+                  style={{
+                    fontSize: 36,
+                    fontWeight: "200",
+                    color: "#ffffff",
+                    fontVariant: ["tabular-nums"],
+                    lineHeight: 40,
+                    letterSpacing: -1.5,
+                  }}
+                >
+                  {speed}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: "700",
+                    color: "#888",
+                    letterSpacing: 2,
+                    marginTop: 2,
+                  }}
+                >
+                  KM/H
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 9,
+                    fontWeight: "800",
+                    color: "#555",
+                    letterSpacing: 3,
+                    marginTop: 2,
+                  }}
+                >
+                  SPEED
+                </Text>
+              </View>
+            </View>
+            {/* 👆 SAMPAI SINI 👆 */}
+          </View>
         ) : isSideBySide ? (
           <View style={styles.sideBySideRow}>
             <GaugeUnit
@@ -421,7 +513,7 @@ const MainGauges = memo(
               grid={theme.grid}
               fontFamily={theme.fontFamily}
             />
-            <View style={{ marginTop: theme.layout === "digital" ? 14 : 8 }}>
+            <View style={{ marginTop: theme.layout === "digital" ? 30 : 25 }}>
               <GaugeUnit
                 value={animSpeed}
                 max={MAX_SPEED}
@@ -479,10 +571,10 @@ const styles = StyleSheet.create({
   },
   gearContainer: {
     position: "absolute",
-    top: -13,
+    top: -15,
     backgroundColor: "rgba(15, 15, 15, 0.8)",
     paddingHorizontal: 16,
-    paddingVertical: 4,
+    paddingVertical: 2,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#333333",

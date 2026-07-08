@@ -53,31 +53,71 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     if (isGaugeTestMode) {
+      // Variabel internal simulator
+      let currentRpm = 800;
+      let currentSpeed = 0;
+      let targetRpm = 800;
+      let phase = "IDLE"; // Fase: IDLE, ACCEL, SHIFT, COAST
+      let phaseTicks = 0;
+
       testIntervalRef.current = setInterval(() => {
-        setTestRpm((prev) => {
-          let next = prev + testDirRef.current * 140;
-          if (next >= 8000) {
-            next = 8000;
-            testDirRef.current = -1;
-          }
-          if (next <= 0) {
-            next = 0;
-            testDirRef.current = 1;
-          }
-          return next;
-        });
-        setTestSpeed((prev) => {
-          let next = prev + testDirRef.current * 3.8;
-          if (next >= 220) next = 220;
-          if (next <= 0) next = 0;
-          return next;
-        });
-      }, 50);
+        phaseTicks++;
+
+        // 1. STATE MACHINE (Simulasi Perilaku Menyetir)
+        if (phase === "IDLE" && phaseTicks > 20) {
+          phase = "ACCEL"; // Mulai ngegas
+          phaseTicks = 0;
+          targetRpm = 7500;
+        } else if (
+          phase === "ACCEL" &&
+          currentRpm > 6000 &&
+          currentSpeed < 80
+        ) {
+          phase = "SHIFT"; // Oper gigi (RPM drop seketika)
+          phaseTicks = 0;
+          targetRpm = 3500;
+        } else if (phase === "SHIFT" && phaseTicks > 4) {
+          phase = "ACCEL"; // Gas lagi setelah oper gigi
+          phaseTicks = 0;
+          targetRpm = 7500;
+        } else if (phase === "ACCEL" && currentRpm > 7000 && phaseTicks > 20) {
+          phase = "COAST"; // Lepas gas / Engine Brake
+          phaseTicks = 0;
+          targetRpm = 800;
+        } else if (phase === "COAST" && phaseTicks > 40) {
+          phase = "IDLE"; // Kembali idle setelah berhenti
+          phaseTicks = 0;
+          currentSpeed = 0;
+        }
+
+        // 2. PERGERAKAN NON-LINEAR (Mengejar target RPM)
+        // Kalau pas oper gigi (SHIFT), turunnya cepat (0.6). Kalau ngegas biasa (0.15).
+        const easing = phase === "SHIFT" ? 0.6 : 0.15;
+        currentRpm += (targetRpm - currentRpm) * easing;
+
+        // 3. TAMBAHKAN SENSOR NOISE / JITTER KHAS OBD2
+        const jitterRpm = currentRpm + (Math.random() * 60 - 30); // Acak ±30 RPM
+
+        // 4. SIMULASI SPEED (Terkait dengan fase gas)
+        if (phase === "ACCEL") {
+          currentSpeed += Math.random() * 2.5; // Speed naik acak
+        } else if (phase === "COAST" || phase === "IDLE") {
+          currentSpeed -= Math.random() * 1.5; // Speed turun pelan
+        }
+        if (currentSpeed < 0) currentSpeed = 0;
+        if (currentSpeed > 220) currentSpeed = 220;
+
+        // Noise kecil untuk Speed
+        const jitterSpeed = currentSpeed + (Math.random() * 2 - 1);
+
+        // Update State
+        setTestRpm(Math.max(0, jitterRpm));
+        setTestSpeed(Math.max(0, jitterSpeed));
+      }, 85); // 85ms = Polling rate realistis adapter ELM327 Bluetooth
     } else {
       if (testIntervalRef.current) clearInterval(testIntervalRef.current);
       setTestRpm(0);
       setTestSpeed(0);
-      testDirRef.current = 1;
     }
     return () => {
       if (testIntervalRef.current) clearInterval(testIntervalRef.current);
@@ -316,7 +356,7 @@ export default function DashboardScreen() {
         />
       )}
 
-      {(state.obdStatus === "ready" || state.isBypassed) && (
+      {/* {(state.obdStatus === "ready" || state.isBypassed) && (
         <TouchableOpacity
           onPress={() => setIsGaugeTestMode((prev) => !prev)}
           style={{
@@ -344,7 +384,7 @@ export default function DashboardScreen() {
             {isGaugeTestMode ? "STOP TEST REV" : "TEST REV"}
           </Text>
         </TouchableOpacity>
-      )}
+      )} */}
 
       {/* GLOBAL OVERLAY LAYER MODALS */}
       <TransmissionModal

@@ -1,12 +1,16 @@
 import React, { memo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import Svg, {
-    Circle,
-    G,
-    Line,
-    Path,
-    Polygon,
-    Text as SvgText,
+  Circle,
+  Defs,
+  G,
+  Line,
+  LinearGradient,
+  Path,
+  Polygon,
+  Rect,
+  Stop,
+  Text as SvgText,
 } from "react-native-svg";
 import { GaugeLayout } from "../../constants/gaugeThemes";
 
@@ -72,6 +76,9 @@ const GaugeUnit = memo(
     insetValue,
     insetUnit,
   }: GaugeUnitProps) => {
+    const { width, height } = useWindowDimensions();
+    const isTabletLandscape = width > height && height >= 480;
+
     const safeValue = Math.min(Math.max(value, 0), max);
     const isRedline = redlineFrom !== undefined && value >= redlineFrom;
     const displayValue =
@@ -97,9 +104,44 @@ const GaugeUnit = memo(
       const tickFontSize = Math.max(9, radius * 0.1);
       const needleLen = radius - 12;
 
+      // ✅ GRADASI: sama seperti tema Full Ring — putih/warna dasar → oren → merah
+      // di redline. Hanya dipasang kalau gauge ini punya redline (RPM),
+      // gauge tanpa redline (Speed) tetap solid color seperti biasa.
+      const hasRedline = redlineFrom !== undefined;
+      const arcGradId = `arc-grad-${unitLabel}`;
+
       return (
         <View style={[styles.cluster, style]}>
           <Svg width={size} height={size / 2 + 26}>
+            {hasRedline && (
+              <Defs>
+                {/* userSpaceOnUse + koordinat FIX (bukan relatif ke path
+                yang sedang tumbuh) supaya warna di posisi X tertentu selalu
+                sama persis, tidak "meregang" waktu jarum masih pendek. */}
+                <LinearGradient
+                  id={arcGradId}
+                  x1={cx - radius}
+                  y1={cy}
+                  x2={cx + radius}
+                  y2={cy}
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <Stop offset="0%" stopColor={color} stopOpacity="1" />
+                  <Stop
+                    offset="25%"
+                    stopColor="rgb(245, 233, 184)"
+                    stopOpacity="1"
+                  />
+                  <Stop offset="50%" stopColor="#FF9900" stopOpacity="1" />
+                  <Stop offset="80%" stopColor="#FF3B30" stopOpacity="1" />
+                  <Stop
+                    offset="100%"
+                    stopColor={REDLINE_COLOR}
+                    stopOpacity="1"
+                  />
+                </LinearGradient>
+              </Defs>
+            )}
             {tickValues.map((t, i) => {
               const rot = startAngle + (t / max) * sweepAngle;
               const isRedZone = redlineFrom !== undefined && t >= redlineFrom;
@@ -167,7 +209,7 @@ const GaugeUnit = memo(
               <Path
                 d={arcPath(cx, cy, startAngle, endAngle, radius)}
                 fill="none"
-                stroke={activeColor}
+                stroke={hasRedline ? `url(#${arcGradId})` : activeColor}
                 strokeWidth={strokeWidth + 1}
                 strokeLinecap="round"
               />
@@ -204,17 +246,6 @@ const GaugeUnit = memo(
               </SvgText>
             )}
           </Svg>
-          <View style={styles.valueBlock}>
-            <Text
-              style={[
-                styles.valueDigits,
-                { color: isRedline ? REDLINE_COLOR : "#fff" },
-              ]}
-            >
-              {displayValue}
-            </Text>
-            <Text style={styles.valueUnit}>{unitLabel}</Text>
-          </View>
           <Text style={styles.gaugeTitle}>{title}</Text>
         </View>
       );
@@ -230,15 +261,67 @@ const GaugeUnit = memo(
       const strokeWidth = Math.max(6, radius * 0.09);
       const circumference = 2 * Math.PI * radius;
       const progress = safeValue / max;
-      const dashOffset = circumference * (1 - progress);
       const redlineProgress =
         redlineFrom !== undefined ? redlineFrom / max : undefined;
+
+      // 1. Logika Pembelahan Semicircle (Kanan & Kiri)
+      const isRpmGauge = redlineFrom !== undefined;
+      const gradRightId = `grad-right-${unitLabel}`;
+      const gradLeftId = `grad-left-${unitLabel}`;
+
+      // Progress untuk setengah lingkaran kanan (Jam 12 ke Jam 6) — maksimal 0.5 (50%)
+      const progRight = Math.min(progress, 0.5);
+      const dashOffsetRight = circumference * (1 - progRight);
+
+      // Progress untuk setengah lingkaran kiri (Jam 6 ke Jam 12) — aktif jika progress > 50%
+      const progLeft = progress > 0.5 ? progress - 0.5 : 0;
+      const dashOffsetLeft = circumference * (1 - progLeft);
 
       return (
         <View style={[styles.cluster, style]}>
           <View style={{ width: size, height: size }}>
             <Svg width={size} height={size}>
-              <G rotation={-90} originX={cx} originY={cy}>
+              {/* 2. Definisi 2 Gradasi (Kanan: Putih->Oren, Kiri: Oren->Merah) */}
+              {isRpmGauge && (
+                <Defs>
+                  {/* Gradasi Kanan: Menyapu dari Jam 12 (Putih) ke Jam 6 (Oren) */}
+                  <LinearGradient
+                    id={gradRightId}
+                    x1="100%"
+                    y1="0%"
+                    x2="0%"
+                    y2="0%"
+                  >
+                    <Stop offset="0%" stopColor={color} stopOpacity="1" />
+                    <Stop
+                      offset="50%"
+                      stopColor="rgb(245, 233, 184)"
+                      stopOpacity="1"
+                    />
+                    <Stop offset="100%" stopColor="#FF9900" stopOpacity="1" />
+                  </LinearGradient>
+
+                  {/* Gradasi Kiri: Menyapu dari Jam 6 (Oren) ke Redline (Merah) */}
+                  <LinearGradient
+                    id={gradLeftId}
+                    x1="100%"
+                    y1="0%"
+                    x2="0%"
+                    y2="0%"
+                  >
+                    <Stop offset="0%" stopColor="#FF9900" stopOpacity="1" />
+                    <Stop offset="60%" stopColor="#FF3B30" stopOpacity="1" />
+                    <Stop
+                      offset="100%"
+                      stopColor={REDLINE_COLOR}
+                      stopOpacity="1"
+                    />
+                  </LinearGradient>
+                </Defs>
+              )}
+
+              {/* 3. Background Track Hitam & Redline Zone */}
+              <G transform={`rotate(-90, ${cx}, ${cy})`}>
                 <Circle
                   cx={cx}
                   cy={cy}
@@ -260,19 +343,43 @@ const GaugeUnit = memo(
                     strokeLinecap="round"
                   />
                 )}
-                <Circle
-                  cx={cx}
-                  cy={cy}
-                  r={radius}
-                  stroke={activeColor}
-                  strokeWidth={strokeWidth}
-                  fill="none"
-                  strokeDasharray={`${circumference} ${circumference}`}
-                  strokeDashoffset={dashOffset}
-                  strokeLinecap="round"
-                />
               </G>
+
+              {/* 4. Semicircle KANAN (Jam 12 ke Jam 6) */}
+              {progress > 0 && (
+                <G transform={`rotate(-90, ${cx}, ${cy})`}>
+                  <Circle
+                    cx={cx}
+                    cy={cy}
+                    r={radius}
+                    stroke={isRpmGauge ? `url(#${gradRightId})` : activeColor}
+                    strokeWidth={strokeWidth}
+                    fill="none"
+                    strokeDasharray={`${circumference} ${circumference}`}
+                    strokeDashoffset={dashOffsetRight}
+                    strokeLinecap="round"
+                  />
+                </G>
+              )}
+
+              {/* 5. Semicircle KIRI (Jam 6 ke Jam 12) — Aktif setelah 50% RPM */}
+              {progress > 0.5 && (
+                <G transform={`rotate(90, ${cx}, ${cy})`}>
+                  <Circle
+                    cx={cx}
+                    cy={cy}
+                    r={radius}
+                    stroke={isRpmGauge ? `url(#${gradLeftId})` : activeColor}
+                    strokeWidth={strokeWidth}
+                    fill="none"
+                    strokeDasharray={`${circumference} ${circumference}`}
+                    strokeDashoffset={dashOffsetLeft}
+                    strokeLinecap="round"
+                  />
+                </G>
+              )}
             </Svg>
+
             <View style={[StyleSheet.absoluteFillObject, styles.ringCenter]}>
               <Text
                 style={[
@@ -300,9 +407,11 @@ const GaugeUnit = memo(
     // =========================================================
     if (layout === "bar") {
       const barWidth = radius * 2.2;
+      const barHeight = 10;
       const progress = safeValue / max;
-      const redlineProgress =
-        redlineFrom !== undefined ? redlineFrom / max : undefined;
+      const hasRedline = redlineFrom !== undefined;
+      const redlineProgress = hasRedline ? redlineFrom! / max : undefined;
+      const barGradId = `bar-grad-${unitLabel}`;
 
       return (
         <View style={[styles.cluster, { width: barWidth }, style]}>
@@ -318,22 +427,65 @@ const GaugeUnit = memo(
               <Text style={styles.valueUnit}> {unitLabel}</Text>
             </Text>
           </View>
-          <View style={[styles.barTrack, { width: barWidth }]}>
+          {/* ✅ GRADASI: sama seperti tema Full Ring & Classic Arc — putih/warna
+          dasar → oren → merah di redline. userSpaceOnUse dgn koordinat FIX
+          (0 s/d barWidth) supaya warna di posisi X tertentu konsisten,
+          tidak "meregang" waktu bar masih pendek. */}
+          <Svg width={barWidth} height={barHeight}>
+            {hasRedline && (
+              <Defs>
+                <LinearGradient
+                  id={barGradId}
+                  x1={0}
+                  y1={0}
+                  x2={barWidth}
+                  y2={0}
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <Stop offset="0%" stopColor={color} stopOpacity="1" />
+                  <Stop
+                    offset="25%"
+                    stopColor="rgb(245, 233, 184)"
+                    stopOpacity="1"
+                  />
+                  <Stop offset="50%" stopColor="#FF9900" stopOpacity="1" />
+                  <Stop offset="80%" stopColor="#FF3B30" stopOpacity="1" />
+                  <Stop
+                    offset="100%"
+                    stopColor={REDLINE_COLOR}
+                    stopOpacity="1"
+                  />
+                </LinearGradient>
+              </Defs>
+            )}
+            <Rect
+              x={0}
+              y={0}
+              width={barWidth}
+              height={barHeight}
+              rx={barHeight / 2}
+              fill="#1a1a1a"
+            />
             {redlineProgress !== undefined && (
-              <View
-                style={[
-                  styles.barRedlineZone,
-                  { left: `${redlineProgress * 100}%`, right: 0 },
-                ]}
+              <Rect
+                x={redlineProgress * barWidth}
+                y={0}
+                width={barWidth * (1 - redlineProgress)}
+                height={barHeight}
+                fill="rgba(255,59,48,0.15)"
               />
             )}
-            <View
-              style={[
-                styles.barFill,
-                { width: `${progress * 100}%`, backgroundColor: activeColor },
-              ]}
-            />
-          </View>
+            {progress > 0 && (
+              <Rect
+                x={0}
+                y={0}
+                width={progress * barWidth}
+                height={barHeight}
+                rx={barHeight / 2}
+                fill={hasRedline ? `url(#${barGradId})` : activeColor}
+              />
+            )}
+          </Svg>
           {/* ✅ FIX: tiap label tick dikasih flex:1 + alignment kiri/tengah/
           kanan sesuai posisinya, supaya "0 1 2 3 4 5 6 7 8" sejajar rapi
           dengan track di bawahnya dan angka ujung tidak kepotong/mepet. */}
@@ -379,6 +531,8 @@ const GaugeUnit = memo(
           {
             width: panelWidth,
             borderColor: isRedline ? REDLINE_COLOR : "#222",
+            // TINGGI KOTAK DINAMIS: Tablet 40, HP 12
+            paddingVertical: isTabletLandscape ? 40 : 12,
           },
           style,
         ]}
@@ -399,7 +553,17 @@ const GaugeUnit = memo(
             ))}
           </View>
         )}
-        <Text style={styles.digitalTitle}>{title}</Text>
+
+        {/* JARAK JUDUL DINAMIS */}
+        <Text
+          style={[
+            styles.digitalTitle,
+            isTabletLandscape && { marginBottom: 12 },
+          ]}
+        >
+          {title}
+        </Text>
+
         <Text
           style={[
             styles.digitalValue,
@@ -414,7 +578,14 @@ const GaugeUnit = memo(
           {displayValue}
           <Text style={styles.digitalUnit}> {unitLabel}</Text>
         </Text>
-        <View style={styles.digitalBarTrack}>
+
+        {/* JARAK GARIS BAWAH DINAMIS */}
+        <View
+          style={[
+            styles.digitalBarTrack,
+            isTabletLandscape && { marginTop: 24 },
+          ]}
+        >
           <View
             style={[
               styles.digitalBarFill,
