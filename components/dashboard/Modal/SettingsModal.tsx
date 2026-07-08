@@ -13,7 +13,8 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { styles } from "../../../styles/dashboard.styles";
+import { getDashboardStyles } from "../../../styles/dashboard.styles";
+import { useAppTheme } from "../../AppThemeContext";
 import { useGaugeTheme } from "../../GaugeThemeContext";
 
 // Ikon representasi tiap bentuk gauge di daftar pilihan tema
@@ -54,6 +55,8 @@ export default function SettingsModal({
   hudMirrorEnabled,
   onToggleHudMirror,
 }: any) {
+  const { colors } = useAppTheme();
+  const styles = getDashboardStyles(colors);
   const [secretTapCount, setSecretTapCount] = useState(0);
   const keyboardOffset = useRef(new Animated.Value(0)).current;
 
@@ -173,12 +176,7 @@ export default function SettingsModal({
             >
               {/* TAB SELECTOR */}
               <View
-                style={{
-                  flexDirection: "row",
-                  marginBottom: sectionSpacing,
-                  backgroundColor: "#000",
-                  borderRadius: 10,
-                }}
+                style={[styles.tabSelector, { marginBottom: sectionSpacing }]}
               >
                 <TouchableOpacity
                   onPress={() => setObdType("bluetooth")}
@@ -191,7 +189,7 @@ export default function SettingsModal({
                   <Text
                     style={[
                       styles.tabText,
-                      obdType === "bluetooth" && { color: "#000" },
+                      obdType === "bluetooth" && { color: "#fff" },
                       isPhoneLandscape && { fontSize: 12 },
                     ]}
                   >

@@ -6,7 +6,8 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { styles } from "../../styles/dashboard.styles";
+import { useAppTheme } from "../../components/AppThemeContext";
+import { getDashboardStyles } from "../../styles/dashboard.styles";
 
 export default function DashboardHeader({
   isConnected,
@@ -20,6 +21,9 @@ export default function DashboardHeader({
 }: any) {
   const tapCount = useRef(0);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { isDark, toggleMode } = useAppTheme();
+  const { colors } = useAppTheme();
+  const styles = getDashboardStyles(colors);
 
   const handleBrandTap = () => {
     tapCount.current += 1;
@@ -69,6 +73,25 @@ export default function DashboardHeader({
         </View>
       </View>
       <View style={styles.headerRight}>
+        <TouchableOpacity
+          onPress={toggleMode}
+          style={{
+            backgroundColor: isDark ? "#333" : "#00ff88",
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: 20,
+          }}
+        >
+          <Text
+            style={{
+              color: isDark ? "#fff" : "#000",
+              fontSize: 10,
+              fontWeight: "bold",
+            }}
+          >
+            {isDark ? "DARK" : "LIGHT"}
+          </Text>
+        </TouchableOpacity>
         <TouchableOpacity onPress={onEnterHud} style={styles.iconBtn}>
           <Ionicons
             name="eye-outline"

@@ -15,11 +15,14 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { useAlert } from "../../components/AlertContext";
+import { useAppTheme } from "../../components/AppThemeContext";
 import { useFuelContext } from "../../components/FuelContext";
-import { fuelStyles as styles } from "../../styles/fuel.styles";
+import { getFuelStyles } from "../../styles/fuel.styles";
 import { getDB } from "../../utils/database";
 
 export default function FuelScreen() {
+  const { colors } = useAppTheme();
+  const styles = getFuelStyles(colors);
   const { showAlert, showConfirm } = useAlert();
   const {
     instFuel,
@@ -197,18 +200,8 @@ export default function FuelScreen() {
                 placeholderTextColor="#444"
               />
             </View>
-            <TouchableOpacity
-              style={{
-                backgroundColor: "#00ff88",
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                borderRadius: 8,
-              }}
-              onPress={handleSavePrice}
-            >
-              <Text style={{ color: "#000", fontWeight: "900", fontSize: 12 }}>
-                SIMPAN
-              </Text>
+            <TouchableOpacity style={styles.priceBtn} onPress={handleSavePrice}>
+              <Text style={styles.priceBtnText}>SIMPAN</Text>
             </TouchableOpacity>
           </View>
         </View>

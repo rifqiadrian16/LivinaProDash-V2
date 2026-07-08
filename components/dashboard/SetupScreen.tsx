@@ -13,7 +13,8 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { styles } from "../../styles/dashboard.styles";
+import { useAppTheme } from "../../components/AppThemeContext";
+import { getDashboardStyles } from "../../styles/dashboard.styles";
 
 // [DIKEMBALIKAN] Prop onSecretTap wajib ada untuk bypass ke Dashboard!
 export default function SetupScreen({
@@ -21,6 +22,8 @@ export default function SetupScreen({
   isConnecting,
   onSecretTap,
 }: any) {
+  const { colors } = useAppTheme();
+  const styles = getDashboardStyles(colors);
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;

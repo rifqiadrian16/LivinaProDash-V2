@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Text, TouchableOpacity, View } from "react-native";
-import { styles } from "../../styles/dashboard.styles";
+import { useAppTheme } from "../../components/AppThemeContext";
+import { getDashboardStyles } from "../../styles/dashboard.styles";
 
 interface WaitingMacScreenProps {
   onOpenSettings: () => void;
@@ -10,6 +11,8 @@ interface WaitingMacScreenProps {
 export default function WaitingMacScreen({
   onOpenSettings,
 }: WaitingMacScreenProps) {
+  const { colors } = useAppTheme();
+  const styles = getDashboardStyles(colors);
   return (
     <View
       style={{

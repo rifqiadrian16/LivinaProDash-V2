@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Modal, Text, TouchableOpacity, View } from "react-native";
-import { styles } from "../../../styles/dashboard.styles";
+import { useAppTheme } from "../../../components/AppThemeContext";
+import { getDashboardStyles } from "../../../styles/dashboard.styles";
 
 // +++ PASTIKAN PATH IMPORT HOOK INI SESUAI DENGAN STRUKTUR FOLDER MAS +++
 // Jika path-nya beda, sesuaikan titik-titiknya (../)
@@ -19,6 +20,8 @@ export default function HudModal({
   mirrorEnabled = true,
   onToggleMirror,
 }: any) {
+  const { colors } = useAppTheme();
+  const styles = getDashboardStyles(colors);
   // ================= PANGGIL JALUR NINJA DI SINI =================
   // Kita suapkan data RPM (data.r) dan Speed (data.s) dari sensor HUD
   const estimatedGear = useGearRatio(data.r, data.s, transmission);

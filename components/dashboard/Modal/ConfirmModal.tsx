@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Modal, Text, TouchableOpacity, View } from "react-native";
-import { styles } from "../../../styles/dashboard.styles";
-
+import { useAppTheme } from "../../../components/AppThemeContext";
+import { getDashboardStyles } from "../../../styles/dashboard.styles";
 export default function ConfirmModal({ visible, config, onClose }: any) {
+  const { colors } = useAppTheme();
+  const styles = getDashboardStyles(colors);
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={[styles.modalBg, { backgroundColor: "rgba(0,0,0,0.9)" }]}>

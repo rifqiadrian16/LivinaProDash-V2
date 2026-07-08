@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AlertProvider } from "../../components/AlertContext";
+import { AppThemeProvider } from "../../components/AppThemeContext";
 import { BLEProvider } from "../../components/BLEContext";
 import { FuelProvider } from "../../components/FuelContext";
 import { GaugeThemeProvider } from "../../components/GaugeThemeContext";
@@ -214,149 +215,155 @@ export default function TabLayout() {
   // <-- Logika Immersive Mode sudah dihapus dari sini (dipindah ke Root)
 
   return (
-    <AlertProvider>
-      <BLEProvider>
-        <FuelProvider>
-          <GaugeThemeProvider>
-            <Tabs
-              screenOptions={{
-                tabBarActiveTintColor: "#00FF88",
-                tabBarInactiveTintColor: isDark ? "#666666" : "#999999",
-                headerShown: false,
+    <AppThemeProvider>
+      <AlertProvider>
+        <BLEProvider>
+          <FuelProvider>
+            <GaugeThemeProvider>
+              <Tabs
+                screenOptions={{
+                  tabBarActiveTintColor: "#00FF88",
+                  tabBarInactiveTintColor: isDark ? "#666666" : "#999999",
+                  headerShown: false,
 
-                tabBarLabelPosition: "below-icon",
+                  tabBarLabelPosition: "below-icon",
 
-                tabBarIconStyle: {
-                  flex: 1,
-                  width: "100%",
-                  height: "100%",
-                  maxHeight: undefined, // <-- Wajib undefined agar tidak dikunci 24px
-                  maxWidth: undefined, // <-- Wajib undefined agar tidak dikunci 24px
-                },
+                  tabBarIconStyle: {
+                    flex: 1,
+                    width: "100%",
+                    height: "100%",
+                    maxHeight: undefined, // <-- Wajib undefined agar tidak dikunci 24px
+                    maxWidth: undefined, // <-- Wajib undefined agar tidak dikunci 24px
+                  },
 
-                /* --- PENGATURAN TAB BAR UTAMA --- */
-                tabBarStyle: {
-                  position: "absolute",
-                  borderTopWidth: 0,
-                  elevation: 0,
-                  shadowOpacity: 0,
-                  borderRadius: 32,
-                  ...dynamicTabStyle,
-                },
+                  /* --- PENGATURAN TAB BAR UTAMA --- */
+                  tabBarStyle: {
+                    position: "absolute",
+                    borderTopWidth: 0,
+                    elevation: 0,
+                    shadowOpacity: 0,
+                    borderRadius: 32,
+                    ...dynamicTabStyle,
+                  },
 
-                /* --- PENGATURAN BACKGROUND & SHADOW --- */
-                tabBarBackground: () => (
-                  <View style={styles.blurContainerWrapper}>
-                    <View style={[styles.blurContainer, styles.bgDark]}>
-                      <BlurView
-                        tint={"dark"}
-                        intensity={80}
-                        style={StyleSheet.absoluteFill}
-                      />
+                  /* --- PENGATURAN BACKGROUND & SHADOW --- */
+                  tabBarBackground: () => (
+                    <View style={styles.blurContainerWrapper}>
+                      <View style={[styles.blurContainer, styles.bgDark]}>
+                        <BlurView
+                          tint={"dark"}
+                          intensity={80}
+                          style={StyleSheet.absoluteFill}
+                        />
+                      </View>
                     </View>
-                  </View>
-                ),
+                  ),
 
-                tabBarItemStyle: {
-                  paddingVertical: isTabletLandscape ? 4 : dynamicItemPadding,
-                  flexDirection: "column", // <-- Wajib agar ikon selalu di atas teks
-                  justifyContent: "center",
-                  alignItems: "center",
-                },
-                tabBarLabelStyle: {
-                  fontWeight: "700",
-                  letterSpacing: 0.5,
-                  ...dynamicLabelStyle,
-                },
-              }}
-            >
-              {/* Screen Tabs Anda Tetap Sama */}
-              <Tabs.Screen
-                name="index"
-                options={{
-                  title: "DASH",
-                  tabBarLabel: () => null, // <-- 1. MATIKAN LABEL DEFAULT
-                  tabBarIcon: ({ color, focused }) => (
-                    <AnimatedTabItem
-                      focused={focused}
-                      color={color}
-                      iconName={focused ? "speedometer" : "speedometer-outline"}
-                      iconSize={isLandscape && !isTabletLandscape ? 20 : 24}
-                      label="DASH" // <-- 2. TAMBAHKAN LABEL INI
-                      labelStyle={dynamicLabelStyle} // <-- 3. TAMBAHKAN STYLE INI
-                      indicatorStyle={dynamicIndicatorStyle}
-                      isLandscape={isLandscape}
-                      isTabletLandscape={isTabletLandscape}
-                    />
-                  ),
+                  tabBarItemStyle: {
+                    paddingVertical: isTabletLandscape ? 4 : dynamicItemPadding,
+                    flexDirection: "column", // <-- Wajib agar ikon selalu di atas teks
+                    justifyContent: "center",
+                    alignItems: "center",
+                  },
+                  tabBarLabelStyle: {
+                    fontWeight: "700",
+                    letterSpacing: 0.5,
+                    ...dynamicLabelStyle,
+                  },
                 }}
-              />
-              <Tabs.Screen
-                name="trip"
-                options={{
-                  title: "TRIPS",
-                  tabBarLabel: () => null, // <-- 1. MATIKAN LABEL DEFAULT
-                  tabBarIcon: ({ color, focused }) => (
-                    <AnimatedTabItem
-                      focused={focused}
-                      color={color}
-                      iconName={focused ? "map" : "map-outline"}
-                      iconSize={isLandscape && !isTabletLandscape ? 20 : 24}
-                      label="TRIPS" // <-- 2. TAMBAHKAN LABEL INI
-                      labelStyle={dynamicLabelStyle} // <-- 3. TAMBAHKAN STYLE INI
-                      indicatorStyle={dynamicIndicatorStyle}
-                      isLandscape={isLandscape}
-                      isTabletLandscape={isTabletLandscape}
-                    />
-                  ),
-                }}
-              />
-              <Tabs.Screen
-                name="diagnostics"
-                options={{
-                  title: "DIAGNOSTICS",
-                  tabBarLabel: () => null, // <-- 1. MATIKAN LABEL DEFAULT
-                  tabBarIcon: ({ color, focused }) => (
-                    <AnimatedTabItem
-                      focused={focused}
-                      color={color}
-                      iconName={focused ? "construct" : "construct-outline"}
-                      iconSize={isLandscape && !isTabletLandscape ? 20 : 24}
-                      label="DIAGNOSTICS" // <-- 2. TAMBAHKAN LABEL INI
-                      labelStyle={dynamicLabelStyle} // <-- 3. TAMBAHKAN STYLE INI
-                      indicatorStyle={dynamicIndicatorStyle}
-                      isLandscape={isLandscape}
-                      isTabletLandscape={isTabletLandscape}
-                    />
-                  ),
-                }}
-              />
-              <Tabs.Screen
-                name="fuel"
-                options={{
-                  title: "FUEL",
-                  tabBarLabel: () => null,
-                  tabBarIcon: ({ color, focused }) => (
-                    <AnimatedTabItem
-                      focused={focused}
-                      color={color}
-                      iconSet="mci"
-                      iconName={focused ? "gas-station" : "gas-station-outline"}
-                      iconSize={isLandscape && !isTabletLandscape ? 20 : 24}
-                      label="FUEL"
-                      labelStyle={dynamicLabelStyle}
-                      indicatorStyle={dynamicIndicatorStyle}
-                      isLandscape={isLandscape}
-                      isTabletLandscape={isTabletLandscape}
-                    />
-                  ),
-                }}
-              />
-            </Tabs>
-          </GaugeThemeProvider>
-        </FuelProvider>
-      </BLEProvider>
-    </AlertProvider>
+              >
+                {/* Screen Tabs Anda Tetap Sama */}
+                <Tabs.Screen
+                  name="index"
+                  options={{
+                    title: "DASH",
+                    tabBarLabel: () => null, // <-- 1. MATIKAN LABEL DEFAULT
+                    tabBarIcon: ({ color, focused }) => (
+                      <AnimatedTabItem
+                        focused={focused}
+                        color={color}
+                        iconName={
+                          focused ? "speedometer" : "speedometer-outline"
+                        }
+                        iconSize={isLandscape && !isTabletLandscape ? 20 : 24}
+                        label="DASH" // <-- 2. TAMBAHKAN LABEL INI
+                        labelStyle={dynamicLabelStyle} // <-- 3. TAMBAHKAN STYLE INI
+                        indicatorStyle={dynamicIndicatorStyle}
+                        isLandscape={isLandscape}
+                        isTabletLandscape={isTabletLandscape}
+                      />
+                    ),
+                  }}
+                />
+                <Tabs.Screen
+                  name="trip"
+                  options={{
+                    title: "TRIPS",
+                    tabBarLabel: () => null, // <-- 1. MATIKAN LABEL DEFAULT
+                    tabBarIcon: ({ color, focused }) => (
+                      <AnimatedTabItem
+                        focused={focused}
+                        color={color}
+                        iconName={focused ? "map" : "map-outline"}
+                        iconSize={isLandscape && !isTabletLandscape ? 20 : 24}
+                        label="TRIPS" // <-- 2. TAMBAHKAN LABEL INI
+                        labelStyle={dynamicLabelStyle} // <-- 3. TAMBAHKAN STYLE INI
+                        indicatorStyle={dynamicIndicatorStyle}
+                        isLandscape={isLandscape}
+                        isTabletLandscape={isTabletLandscape}
+                      />
+                    ),
+                  }}
+                />
+                <Tabs.Screen
+                  name="diagnostics"
+                  options={{
+                    title: "DIAGNOSTICS",
+                    tabBarLabel: () => null, // <-- 1. MATIKAN LABEL DEFAULT
+                    tabBarIcon: ({ color, focused }) => (
+                      <AnimatedTabItem
+                        focused={focused}
+                        color={color}
+                        iconName={focused ? "construct" : "construct-outline"}
+                        iconSize={isLandscape && !isTabletLandscape ? 20 : 24}
+                        label="DIAGNOSTICS" // <-- 2. TAMBAHKAN LABEL INI
+                        labelStyle={dynamicLabelStyle} // <-- 3. TAMBAHKAN STYLE INI
+                        indicatorStyle={dynamicIndicatorStyle}
+                        isLandscape={isLandscape}
+                        isTabletLandscape={isTabletLandscape}
+                      />
+                    ),
+                  }}
+                />
+                <Tabs.Screen
+                  name="fuel"
+                  options={{
+                    title: "FUEL",
+                    tabBarLabel: () => null,
+                    tabBarIcon: ({ color, focused }) => (
+                      <AnimatedTabItem
+                        focused={focused}
+                        color={color}
+                        iconSet="mci"
+                        iconName={
+                          focused ? "gas-station" : "gas-station-outline"
+                        }
+                        iconSize={isLandscape && !isTabletLandscape ? 20 : 24}
+                        label="FUEL"
+                        labelStyle={dynamicLabelStyle}
+                        indicatorStyle={dynamicIndicatorStyle}
+                        isLandscape={isLandscape}
+                        isTabletLandscape={isTabletLandscape}
+                      />
+                    ),
+                  }}
+                />
+              </Tabs>
+            </GaugeThemeProvider>
+          </FuelProvider>
+        </BLEProvider>
+      </AlertProvider>
+    </AppThemeProvider>
   );
 }
 

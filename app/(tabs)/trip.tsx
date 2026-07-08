@@ -22,12 +22,15 @@ import { WebView } from "react-native-webview";
 import { useAlert } from "../../components/AlertContext";
 
 // === IMPORT KOMPONEN & STYLE YANG SUDAH DIPISAH ===
+import { useAppTheme } from "../../components/AppThemeContext";
 import ShareModal from "../../components/trip/ShareModal";
-import { tripStyles as styles } from "../../styles/trip.styles";
+import { getTripStyles } from "../../styles/trip.styles";
 import { getDB } from "../../utils/database";
 import { getMapHtml } from "../../utils/tripTemplates";
 
 export default function TripScreen() {
+  const { colors } = useAppTheme();
+  const styles = getTripStyles(colors);
   const { showAlert, showConfirm } = useAlert();
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
   const [playbackIndex, setPlaybackIndex] = useState(0);

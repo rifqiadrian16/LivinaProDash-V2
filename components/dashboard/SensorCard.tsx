@@ -1,10 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { memo } from "react";
 import { Text, View } from "react-native";
-import { styles } from "../../styles/dashboard.styles";
+import { useAppTheme } from "../../components/AppThemeContext";
+import { getDashboardStyles } from "../../styles/dashboard.styles";
 
 const SensorCard = memo(
   ({ icon, label, value, color, compact = false }: any) => {
+    const { colors } = useAppTheme();
+    const styles = getDashboardStyles(colors);
     // ==========================================
     // 1. LAYOUT LANDSCAPE (KARTU HORIZONTAL)
     // ==========================================

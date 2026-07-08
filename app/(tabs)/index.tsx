@@ -25,6 +25,7 @@ import MainGauges from "../../components/dashboard/MainGauges";
 import WaitingMacScreen from "../../components/dashboard/WaitingMacScreen";
 
 // IMPORT MODALS
+import { useAppTheme } from "../../components/AppThemeContext";
 import ConfirmModal from "../../components/dashboard/Modal/ConfirmModal";
 import HudModal from "../../components/dashboard/Modal/HudModal";
 import OTAModal from "../../components/dashboard/Modal/OTAModal";
@@ -33,9 +34,11 @@ import TerminalModal from "../../components/dashboard/Modal/TerminalModal";
 import TransmissionModal from "../../components/dashboard/Modal/TransmissionModal";
 import SetupScreen from "../../components/dashboard/SetupScreen";
 import SaveTripModal from "../../components/trip/SaveTripModal";
-import { styles } from "../../styles/dashboard.styles";
+import { getDashboardStyles } from "../../styles/dashboard.styles";
 
 export default function DashboardScreen() {
+  const { colors } = useAppTheme();
+  const styles = getDashboardStyles(colors);
   const { state, actions } = useDashboard();
 
   useKeepAwake();

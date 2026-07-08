@@ -1,9 +1,12 @@
 import React, { memo } from "react";
 import { Text, View } from "react-native";
-import { styles } from "../../styles/dashboard.styles";
+import { useAppTheme } from "../../components/AppThemeContext";
+import { getDashboardStyles } from "../../styles/dashboard.styles";
 import SensorCard from "./SensorCard";
 
 const DataGrid = memo(({ data, instFuel, avgFuel, compact = false }: any) => {
+  const { colors } = useAppTheme();
+  const styles = getDashboardStyles(colors);
   return (
     <>
       {/* KOTAK FUEL DIPERAS */}

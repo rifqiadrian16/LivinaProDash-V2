@@ -1,6 +1,7 @@
 import React from "react";
 import { Modal, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { styles } from "../../../styles/dashboard.styles";
+import { useAppTheme } from "../../../components/AppThemeContext";
+import { getDashboardStyles } from "../../../styles/dashboard.styles";
 
 export default function OTAModal({
   visible,
@@ -11,6 +12,8 @@ export default function OTAModal({
   setOtaPass,
   onEnterOta,
 }: any) {
+  const { colors } = useAppTheme();
+  const styles = getDashboardStyles(colors);
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.modalBg}>
