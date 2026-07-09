@@ -251,7 +251,7 @@ export const getTripStyles = (c: AppColors) =>
       alignItems: "center",
       justifyContent: "center",
     },
-    shareSubmitText: { color: "#111", fontWeight: "900", fontSize: 16 },
+    shareSubmitText: { color: c.label, fontWeight: "900", fontSize: 16 },
     emptyStateContainer: {
       flex: 1,
       justifyContent: "center",

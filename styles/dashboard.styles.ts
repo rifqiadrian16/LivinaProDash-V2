@@ -277,6 +277,17 @@ export const getDashboardStyles = (c: AppColors) =>
     unitSmall: { fontSize: 10, color: c.textMuted },
 
     // FAB RECORDING — merah bahaya, sengaja TIDAK ikut tema (universal warning color)
+    recordFabShadowWrap: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: "transparent",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.5,
+      shadowRadius: 8,
+      elevation: 8,
+    },
     recordFabActive: {
       backgroundColor: c.card,
       borderWidth: 2,
@@ -304,10 +315,6 @@ export const getDashboardStyles = (c: AppColors) =>
       backgroundColor: c.accent,
       justifyContent: "center",
       alignItems: "center",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.5,
-      shadowRadius: 8,
-      elevation: 8,
     },
     secretZone: {
       position: "absolute",

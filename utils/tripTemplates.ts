@@ -1,3 +1,22 @@
+// Helper: ubah "#RRGGBB" jadi "rgba(r,g,b,a)" — dipakai supaya warna dari
+// AppThemeContext (yang solid) tetap bisa dipakai untuk overlay tembus
+// pandang (brand badge, gradient fade) tanpa harus define token baru.
+function hexToRgba(hex: string, alpha: number): string {
+  const clean = hex.replace("#", "");
+  const full =
+    clean.length === 3
+      ? clean
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : clean;
+  const r = parseInt(full.substring(0, 2), 16);
+  const g = parseInt(full.substring(2, 4), 16);
+  const b = parseInt(full.substring(4, 6), 16);
+  if ([r, g, b].some((v) => isNaN(v))) return hex; // fallback aman kalau bukan hex valid
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export const getMapHtml = (
   tripData: any,
   mapType: "dark" | "normal" | "satellite" = "dark",
@@ -66,7 +85,26 @@ export const getMapHtml = (
   `;
 };
 
-export const getShareCardHtml = (trip: any, theme: "solid" | "transparent") => {
+export const getShareCardHtml = (
+  trip: any,
+  theme: "solid" | "transparent",
+  colors?: {
+    card: string;
+    text: string;
+    textMuted: string;
+    textFaint: string;
+    border: string;
+  },
+) => {
+  // Fallback dark values kalau ShareModal lama masih manggil tanpa colors
+  // (misal ada pemanggilan lain yang belum di-update).
+  const c = {
+    card: colors?.card ?? "#111111",
+    text: colors?.text ?? "#ffffff",
+    textMuted: colors?.textMuted ?? "rgba(255,255,255,0.4)",
+    textFaint: colors?.textFaint ?? "rgba(255,255,255,0.3)",
+    border: colors?.border ?? "rgba(255,255,255,0.1)",
+  };
   const distNum = parseFloat(trip.distance) || 0;
   const topSpeedNum = parseFloat(trip.details?.topSpeed) || 0;
   const avgSpeed = (topSpeedNum * 0.6).toFixed(0);
@@ -90,17 +128,19 @@ export const getShareCardHtml = (trip: any, theme: "solid" | "transparent") => {
 
   // +++ LOGIKA TEMA DINAMIS SAKTI +++
   const isSolid = theme === "solid";
-  const bgColor = isSolid ? "#111" : "transparent";
-  const fadeBg = isSolid ? "linear-gradient(transparent,#111)" : "transparent";
-  const brandBg = isSolid ? "rgba(0,0,0,0.6)" : "transparent";
+  const bgColor = isSolid ? c.card : "transparent";
+  const fadeBg = isSolid
+    ? `linear-gradient(transparent, ${c.card})`
+    : "transparent";
+  const brandBg = isSolid ? hexToRgba(c.card, 0.6) : "transparent";
 
-  const labelColor = isSolid
-    ? "rgba(255,255,255,0.4)"
-    : "rgba(255,255,255,0.85)";
-  const subTextColor = isSolid
-    ? "rgba(255,255,255,0.3)"
-    : "rgba(255,255,255,0.75)";
+  const labelColor = isSolid ? c.textMuted : "rgba(255,255,255,0.85)";
+  const subTextColor = isSolid ? c.textFaint : "rgba(255,255,255,0.75)";
   const textShadow = isSolid ? "none" : "0px 1px 4px rgba(0,0,0,0.8)";
+
+  const mainTextColor = isSolid ? c.text : "#fff";
+  const brandTextColor = isSolid ? c.textMuted : "rgba(255,255,255,0.7)";
+  const footerBorderColor = isSolid ? c.border : "rgba(255,255,255,0.1)";
 
   // Basemap Satelit (Hanya di-load kalau temanya solid)
   const tileUrl = isSolid
@@ -130,20 +170,20 @@ body { background:transparent; overflow:hidden; width:270px; }
 .map-wrap { position:relative; width:270px; height:200px; overflow:hidden; }
 .map-brand { position:absolute; top:10px; left:12px; z-index:999; background:${brandBg}; border-radius:4px; padding:3px 8px; display:flex; align-items:center; gap:4px; }
 .brand-dot { width:5px; height:5px; border-radius:50%; background:${accentColor}; }
-.brand-txt { font-size:9px; font-weight:700; letter-spacing:1.5px; color:rgba(255,255,255,0.7); }
+.brand-txt { font-size:9px; font-weight:700; letter-spacing:1.5px; color:${brandTextColor}; }
 
 /* Efek gradien dimatikan jika transparan */
 .fade-btm { position:absolute; bottom:0; left:0; width:270px; height:70px; z-index:998; background:${fadeBg}; pointer-events:none; }
 .body { padding:16px 18px 18px; background:${bgColor}; text-shadow: ${textShadow}; }
 
-.car-name { font-size:26px; font-weight:100; font-style:italic; color:#fff; margin-bottom:3px; letter-spacing:0.5px; margin-left: 15px;}
+.car-name { font-size:26px; font-weight:100; font-style:italic; color:${mainTextColor}; margin-bottom:3px; letter-spacing:0.5px; margin-left: 15px;}
 .trip-date { font-size:10px; color:${labelColor}; margin-bottom:12px; letter-spacing:0.5px; text-transform:uppercase; margin-left: 15px; }
 .accent { width:24px; height:2.5px; background:${accentColor}; border-radius:2px; margin-bottom:16px; margin-left: 15px;}
 .stats { display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; margin-left: 15px; }
 .stat-label { font-size:9px; color:${labelColor}; letter-spacing:1px; margin-bottom:2px; text-transform:uppercase; }
-.stat-val { font-size:24px; font-weight:700; color:#fff; line-height:1; letter-spacing:-0.5px; }
+.stat-val { font-size:24px; font-weight:700; color:${mainTextColor}; line-height:1; letter-spacing:-0.5px; }
 .unit { font-size:12px; font-weight:700; color:${accentColor}; margin-left:1px; }
-.footer { margin-top:16px; padding-top:12px; border-top:0.5px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center; margin-right:15px; margin-left: 15px }
+.footer { margin-top:16px; padding-top:12px; border-top:0.5px solid ${footerBorderColor}; display:flex; justify-content:space-between; align-items:center; margin-right:15px; margin-left: 15px }
 .footer-brand { font-size:9px; font-weight:700; letter-spacing:2px; color:${labelColor}; text-transform:uppercase;}
 .footer-via { font-size:9px; color:${subTextColor};}
 </style>

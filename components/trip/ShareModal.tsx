@@ -13,8 +13,9 @@ import {
 } from "react-native";
 import ViewShot from "react-native-view-shot";
 import { WebView } from "react-native-webview";
-import { tripStyles as styles } from "../../styles/trip.styles";
+import { getTripStyles } from "../../styles/trip.styles";
 import { getShareCardHtml } from "../../utils/tripTemplates";
+import { useAppTheme } from "../AppThemeContext";
 
 interface ShareModalProps {
   visible: boolean;
@@ -29,6 +30,8 @@ export default function ShareModal({
   onClose,
   showAlert,
 }: ShareModalProps) {
+  const { colors } = useAppTheme();
+  const styles = getTripStyles(colors);
   const [shareTheme, setShareTheme] = useState<"solid" | "transparent">(
     "solid",
   );
@@ -180,14 +183,14 @@ export default function ShareModal({
         {isSaving ? (
           <ActivityIndicator
             size="small"
-            color="#111"
+            color={colors.label}
             style={{ marginRight: 6 }}
           />
         ) : (
           <Ionicons
             name="download-outline"
             size={20}
-            color="#111"
+            color={colors.label}
             style={{ marginRight: 6 }}
           />
         )}
@@ -228,10 +231,10 @@ export default function ShareModal({
             },
           ]}
         >
-          <ActivityIndicator size="large" color="#00ff88" />
+          <ActivityIndicator size="large" color={colors.accent} />
           <Text
             style={{
-              color: "#fff",
+              color: colors.text,
               fontSize: 10,
               fontWeight: "bold",
               marginTop: 8,
@@ -250,11 +253,11 @@ export default function ShareModal({
           height: cardHeight,
           overflow: "hidden",
           borderRadius: 16,
-          backgroundColor: "#121212",
+          backgroundColor: colors.card,
         }}
       >
         <WebView
-          source={{ html: getShareCardHtml(tripData, shareTheme) }}
+          source={{ html: getShareCardHtml(tripData, shareTheme, colors) }}
           style={{
             width: cardWidth,
             height: cardHeight,

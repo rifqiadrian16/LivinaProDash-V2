@@ -47,6 +47,11 @@ export default function DashboardScreen() {
   const isTabletLandscape = isLandscape && height >= 480;
   const bottomReserve = isLandscape ? 55 : 85;
   const insets = useSafeAreaInsets();
+  const fabSize = isLandscape ? Math.min(height * 0.16, 60) : 60;
+
+  const collapsedIconSize = fabSize * 0.25;
+  const expandedIconSize = fabSize * 0.47;
+  const collapsedIconOffset = fabSize * 0.07;
 
   const [isGaugeTestMode, setIsGaugeTestMode] = useState(false);
   const [testRpm, setTestRpm] = useState(0);
@@ -324,40 +329,61 @@ export default function DashboardScreen() {
             { transform: [{ translateX: state.fabX }] },
           ]}
         >
-          <TouchableOpacity
+          <View
             style={[
-              styles.recordFab,
-              state.isRecording && styles.recordFabActive,
-              !state.isFabOpen && { justifyContent: "center" },
+              styles.recordFabShadowWrap,
+              {
+                width: fabSize,
+                height: fabSize,
+                borderRadius: fabSize / 2,
+              },
             ]}
-            onPress={() => {
-              if (!state.isFabOpen) actions.toggleFab(true);
-              else {
-                actions.toggleRecording();
-                if (state.isRecording)
-                  setTimeout(() => actions.toggleFab(false), 500);
-              }
-            }}
           >
-            <Ionicons
-              name={state.isRecording ? "stop" : "videocam"}
-              size={state.isFabOpen ? 28 : 13}
-              color={
-                state.isRecording
-                  ? isDark
-                    ? "#fff"
-                    : "#000"
-                  : state.isFabOpen
+            <TouchableOpacity
+              style={[
+                styles.recordFab,
+                {
+                  width: fabSize,
+                  height: fabSize,
+                  borderRadius: fabSize / 2,
+                },
+                state.isRecording && styles.recordFabActive,
+                !state.isFabOpen && { justifyContent: "center" },
+              ]}
+              onPress={() => {
+                if (!state.isFabOpen) actions.toggleFab(true);
+                else {
+                  actions.toggleRecording();
+                  if (state.isRecording)
+                    setTimeout(() => actions.toggleFab(false), 500);
+                }
+              }}
+            >
+              <Ionicons
+                name={state.isRecording ? "stop" : "videocam"}
+                size={state.isFabOpen ? expandedIconSize : collapsedIconSize}
+                color={
+                  state.isRecording
                     ? isDark
-                      ? "#000"
-                      : "#FFF"
-                    : isDark
-                      ? "#000"
-                      : "#FFF"
-              }
-              style={!state.isFabOpen && { position: "absolute", left: 6 }}
-            />
-          </TouchableOpacity>
+                      ? "#fff"
+                      : "#000"
+                    : state.isFabOpen
+                      ? isDark
+                        ? "#000"
+                        : "#FFF"
+                      : isDark
+                        ? "#000"
+                        : "#FFF"
+                }
+                style={
+                  !state.isFabOpen && {
+                    position: "absolute",
+                    left: collapsedIconOffset,
+                  }
+                }
+              />
+            </TouchableOpacity>
+          </View>
         </Animated.View>
       )}
 

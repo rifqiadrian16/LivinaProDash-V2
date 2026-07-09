@@ -44,7 +44,7 @@ const SensorCard = memo(
             <Text
               style={[
                 styles.cardLabel,
-                { fontSize: 8, marginTop: 0, textAlign: "right" },
+                { fontSize: 7, marginTop: 0, textAlign: "right" },
               ]}
             >
               {label}

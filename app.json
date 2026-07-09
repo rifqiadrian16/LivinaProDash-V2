@@ -2,7 +2,7 @@
   "expo": {
     "name": "LivinaProDash",
     "slug": "LivinaProDash",
-    "version": "2.8.5",
+    "version": "3.0.0",
     "orientation": "default",
     "icon": "./assets/images/livina.png",
     "scheme": "livinaprodash",
@@ -81,10 +81,7 @@
         "@config-plugins/react-native-ble-plx",
         {
           "isBackgroundEnabled": true,
-          "modes": [
-            "peripheral",
-            "central"
-          ],
+          "modes": ["peripheral", "central"],
           "bluetoothAlwaysPermission": "Livina ProDash butuh akses Bluetooth untuk terhubung dan membaca data dari Modul ECU/OBD2 Mobil Anda."
         }
       ],
