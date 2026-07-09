@@ -10,6 +10,11 @@ export interface GaugeTheme {
   rpmNeedle: string;
   speedColor: string;
   speedNeedle: string;
+  // 👇 TAMBAHAN: Properti opsional khusus untuk Light Mode
+  rpmColorLight?: string;
+  rpmNeedleLight?: string;
+  speedColorLight?: string;
+  speedNeedleLight?: string;
   fontFamily?: string;
   glow: boolean;
   grid: boolean;
@@ -26,6 +31,11 @@ export const GAUGE_THEMES: GaugeTheme[] = [
     rpmNeedle: "#ffffff",
     speedColor: "#3498db",
     speedNeedle: "#3498db",
+    // ✅ Light Mode: Putih jadi Abu-abu gelap, Biru muda jadi Biru Tua
+    rpmColorLight: "#111111",
+    rpmNeedleLight: "#333333",
+    speedColorLight: "#005C97",
+    speedNeedleLight: "#005C97",
     glow: false,
     grid: false,
   },
@@ -35,8 +45,13 @@ export const GAUGE_THEMES: GaugeTheme[] = [
     layout: "ring",
     rpmColor: "#ffffff",
     rpmNeedle: "#ffc400",
-    speedColor: "#00ff88",
-    speedNeedle: "#00ff88",
+    speedColor: "#3498db",
+    speedNeedle: "#3498db",
+    // ✅ Light Mode: Putih jadi Abu-abu gelap, Neon jadi Hijau & Kuning Pekat
+    rpmColorLight: "#111111",
+    rpmNeedleLight: "#d4a000",
+    speedColorLight: "#005C97",
+    speedNeedleLight: "#005C97",
     glow: true,
     grid: false,
   },
@@ -44,10 +59,15 @@ export const GAUGE_THEMES: GaugeTheme[] = [
     id: "minimal",
     name: "Minimal Bar",
     layout: "bar",
-    rpmColor: "#ffffff",
+    rpmColor: "#FFFFFF",
     rpmNeedle: "#ffffff",
-    speedColor: "#00ff88",
-    speedNeedle: "#00ff88",
+    speedColor: "#3498db",
+    speedNeedle: "#3498db",
+    // ✅ Light Mode: Warna pekat agar bar terlihat tegas di background terang
+    rpmColorLight: "#111111",
+    rpmNeedleLight: "#333333",
+    speedColorLight: "#005C97",
+    speedNeedleLight: "#005C97",
     glow: false,
     grid: false,
   },
@@ -55,10 +75,15 @@ export const GAUGE_THEMES: GaugeTheme[] = [
     id: "digital",
     name: "Digital LCD",
     layout: "digital",
-    rpmColor: "#00ff88",
-    rpmNeedle: "#00ff88",
-    speedColor: "#00ff88",
-    speedNeedle: "#00ff88",
+    rpmColor: "#3498db",
+    rpmNeedle: "#3498db",
+    speedColor: "#3498db",
+    speedNeedle: "#3498db",
+    // ✅ Light Mode: Hijau botol gelap agar mirip LCD kalkulator lawas di siang hari
+    rpmColorLight: "#005C97",
+    rpmNeedleLight: "#005C97",
+    speedColorLight: "#005C97",
+    speedNeedleLight: "#005C97",
     fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
     glow: true,
     grid: true,

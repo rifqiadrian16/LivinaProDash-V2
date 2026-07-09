@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import { StatusBar } from "expo-status-bar";
 import React from "react";
 import {
   ActivityIndicator,
@@ -85,8 +84,6 @@ export default function SetupScreen({
       ]}
       edges={["top", "bottom"]}
     >
-      <StatusBar style="light" />
-
       <ScrollView
         contentContainerStyle={{
           flexGrow: 1,
@@ -105,7 +102,11 @@ export default function SetupScreen({
             <View style={{ flex: 1, alignItems: "center" }}>
               {/* [DIKEMBALIKAN] TouchableOpacity dengan onSecretTap aktif kembali! */}
               <TouchableOpacity activeOpacity={1} onPress={onSecretTap}>
-                <Ionicons name="car-sport" size={iconSize} color="#00ff88" />
+                <Ionicons
+                  name="car-sport"
+                  size={iconSize}
+                  color={colors.accent}
+                />
               </TouchableOpacity>
 
               <Text
@@ -134,7 +135,11 @@ export default function SetupScreen({
             <View style={styles.headerCentered}>
               {/* [DIKEMBALIKAN] TouchableOpacity dengan onSecretTap aktif kembali! */}
               <TouchableOpacity activeOpacity={1} onPress={onSecretTap}>
-                <Ionicons name="car-sport" size={iconSize} color="#00ff88" />
+                <Ionicons
+                  name="car-sport"
+                  size={iconSize}
+                  color={colors.accent}
+                />
               </TouchableOpacity>
 
               <Text style={[styles.setupTitle, { fontSize: titleFontSize }]}>

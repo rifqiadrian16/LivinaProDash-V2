@@ -29,7 +29,7 @@ import { getDB } from "../../utils/database";
 import { getMapHtml } from "../../utils/tripTemplates";
 
 export default function TripScreen() {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const styles = getTripStyles(colors);
   const { showAlert, showConfirm } = useAlert();
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
@@ -599,7 +599,8 @@ export default function TripScreen() {
               paddingHorizontal: isPhoneLandscape ? 10 : 16,
               paddingVertical: isPhoneLandscape ? 2 : 4,
               borderRadius: 20,
-              backgroundColor: playbackMapType === type ? "#00ff88" : "#333",
+              backgroundColor:
+                playbackMapType === type ? colors.accent : colors.card,
             }}
           >
             <Text
@@ -607,7 +608,7 @@ export default function TripScreen() {
                 fontSize: isPhoneLandscape ? 10 : 11,
                 fontWeight: "bold",
                 textTransform: "uppercase",
-                color: playbackMapType === type ? "#121212" : "#fff",
+                color: playbackMapType === type ? colors.label : colors.text,
               }}
             >
               {type}
@@ -626,7 +627,7 @@ export default function TripScreen() {
             minHeight: 220,
             marginBottom: 10,
           },
-          isPhoneLandscape && { height: 180, minHeight: 110, marginBottom: 4 },
+          isPhoneLandscape && { height: 170, minHeight: 110, marginBottom: 4 },
         ]}
         onTouchStart={(e) => {
           if (e.nativeEvent.touches.length > 1) setIsScrollEnabled(false);
@@ -676,7 +677,7 @@ export default function TripScreen() {
           <Ionicons
             name={isPlaying ? "pause" : "play"}
             size={isPhoneLandscape ? 20 : 24}
-            color="#121212"
+            color={colors.label}
           />
         </TouchableOpacity>
         <View style={styles.sliderWrapper}>
@@ -690,9 +691,9 @@ export default function TripScreen() {
               setIsPlaying(false);
               setPlaybackIndex(val);
             }}
-            minimumTrackTintColor="#00ff88"
+            minimumTrackTintColor={colors.accent}
             maximumTrackTintColor="#333"
-            thumbTintColor="#fff"
+            thumbTintColor={colors.text}
           />
           <View style={styles.timeLabels}>
             <Text style={styles.timeText}>00:00</Text>
@@ -718,7 +719,7 @@ export default function TripScreen() {
         ]}
       >
         <View style={styles.inspectorHeader}>
-          <Ionicons name="analytics" size={20} color="#00ff88" />
+          <Ionicons name="analytics" size={20} color={colors.accent} />
           <Text style={styles.inspectorTitle}>LIVE TELEMETRY</Text>
           <Text style={styles.inspectorNote}>
             {selectedTrip.routeData[playbackIndex]?.note || ""}
@@ -728,7 +729,7 @@ export default function TripScreen() {
         <View style={styles.inspectorGrid}>
           <View style={styles.inspectorBox}>
             <Text style={styles.inspectorLabel}>SPEED</Text>
-            <Text style={[styles.inspectorValue, { color: "#00ff88" }]}>
+            <Text style={[styles.inspectorValue, { color: colors.accent }]}>
               {selectedTrip.routeData[playbackIndex]?.speed || 0}{" "}
               <Text style={styles.inspectorUnit}>km/h</Text>
             </Text>
@@ -776,7 +777,7 @@ export default function TripScreen() {
                   color:
                     selectedTrip.routeData[playbackIndex]?.stft > 0
                       ? "#ff4444"
-                      : "#00cc00",
+                      : colors.accent,
                 },
               ]}
             >
@@ -811,7 +812,7 @@ export default function TripScreen() {
         </View>
         <View style={styles.detailBox}>
           <Text style={styles.detailLabel}>FUEL USED</Text>
-          <Text style={[styles.detailValue, { color: "#00cc00" }]}>
+          <Text style={[styles.detailValue, { color: colors.accent }]}>
             {selectedTrip.details?.fuelUsed || "0 L"}
           </Text>
         </View>
@@ -940,7 +941,7 @@ export default function TripScreen() {
                 <Text
                   style={[
                     styles.ecoText,
-                    { color: trip.ecoScore > 80 ? "#00cc00" : "#ffcc00" },
+                    { color: trip.ecoScore > 80 ? colors.accent : "#ffcc00" },
                   ]}
                 >
                   ECO {trip.ecoScore}
@@ -948,7 +949,7 @@ export default function TripScreen() {
               </View>
             </View>
             <View style={styles.routeContainer}>
-              <Ionicons name="map-outline" size={24} color="#00ff88" />
+              <Ionicons name="map-outline" size={24} color={colors.accent} />
               <Text style={styles.routeText}>{trip.route}</Text>
             </View>
             <View style={styles.tripStatsGrid}>
@@ -984,7 +985,7 @@ export default function TripScreen() {
       <View style={[styles.headerRow, isLandscape && { marginBottom: 0 }]}>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <Text style={styles.headerTitle}>
-            TRIP <Text style={{ color: "#00ff88" }}>LOGS</Text>
+            TRIP <Text style={{ color: colors.accent }}>LOGS</Text>
           </Text>
           <TouchableOpacity
             onPress={injectDummyData}
@@ -1005,7 +1006,11 @@ export default function TripScreen() {
           }}
           disabled={isSyncing}
         >
-          <Ionicons name="sync-circle-outline" size={24} color="#00ff88" />
+          <Ionicons
+            name="sync-circle-outline"
+            size={24}
+            color={colors.accent}
+          />
         </TouchableOpacity>
       </View>
 
@@ -1075,14 +1080,18 @@ export default function TripScreen() {
                     <Ionicons
                       name="download-outline"
                       size={24}
-                      color="#00ff88"
+                      color={colors.accent}
                     />
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => setSelectedTrip(null)}
                     style={styles.closeBtn}
                   >
-                    <Ionicons name="close" size={24} color="#fff" />
+                    <Ionicons
+                      name="close"
+                      size={24}
+                      color={isDark ? "#FFF" : "#000"}
+                    />
                   </TouchableOpacity>
                 </View>
               </View>

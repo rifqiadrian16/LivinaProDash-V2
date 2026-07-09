@@ -52,7 +52,7 @@ const DataGrid = memo(({ data, instFuel, avgFuel, compact = false }: any) => {
           icon="leaf"
           label="MAF"
           value={`${data.m.toFixed(1)} g/s`}
-          color="#00ff88"
+          color={colors.accent}
           compact={compact}
         />
         <SensorCard

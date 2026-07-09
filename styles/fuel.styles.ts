@@ -3,8 +3,8 @@ import { AppColors } from "../constants/appThemes";
 
 export const getFuelStyles = (c: AppColors) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: c.bg, paddingHorizontal: 10 },
-    scrollContent: { padding: 15, paddingBottom: 100 },
+    container: { flex: 1, backgroundColor: c.bg, paddingHorizontal: 25 },
+    scrollContent: { paddingTop: 0, paddingBottom: 50 },
     headerTitle: {
       fontSize: 23,
       fontWeight: "900",

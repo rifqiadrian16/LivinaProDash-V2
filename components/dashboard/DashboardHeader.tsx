@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useAppTheme } from "../../components/AppThemeContext";
 import { getDashboardStyles } from "../../styles/dashboard.styles";
@@ -19,6 +20,8 @@ export default function DashboardHeader({
   onOpenTerminal,
   isLocked,
 }: any) {
+  const { width, height } = useWindowDimensions();
+  const isPotrait = height > width;
   const tapCount = useRef(0);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { isDark, toggleMode } = useAppTheme();
@@ -57,7 +60,7 @@ export default function DashboardHeader({
           <Ionicons
             name={isLocked ? "lock-closed" : "lock-open"}
             size={10}
-            color={isLocked ? "#00ff88" : "#888"}
+            color={isLocked ? colors.accent : "#888"}
           />
           <Text
             style={{
@@ -65,38 +68,32 @@ export default function DashboardHeader({
               fontWeight: "bold",
               letterSpacing: 0.5,
               marginLeft: 4,
-              color: isLocked ? "#00ff88" : "#888",
+              color: isLocked ? colors.accent : "#888",
             }}
           >
             {isLocked ? "TERKUNCI" : "TERBUKA"}
           </Text>
         </View>
       </View>
-      <View style={styles.headerRight}>
+      <View style={[styles.headerRight, { gap: isPotrait ? 5 : 10 }]}>
         <TouchableOpacity
           onPress={toggleMode}
           style={{
-            backgroundColor: isDark ? "#333" : "#00ff88",
-            paddingHorizontal: 12,
-            paddingVertical: 6,
+            backgroundColor: isDark ? "#333" : "#009e63",
+            paddingHorizontal: 10,
+            paddingVertical: 10,
             borderRadius: 20,
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
-          <Text
-            style={{
-              color: isDark ? "#fff" : "#000",
-              fontSize: 10,
-              fontWeight: "bold",
-            }}
-          >
-            {isDark ? "DARK" : "LIGHT"}
-          </Text>
+          <Ionicons name={isDark ? "moon" : "sunny"} size={14} color="#fff" />
         </TouchableOpacity>
         <TouchableOpacity onPress={onEnterHud} style={styles.iconBtn}>
           <Ionicons
             name="eye-outline"
             size={18}
-            color={isNightTime ? "#f1c40f" : "#00ffcc"}
+            color={isNightTime ? "#f1c40f" : colors.accent}
           />
         </TouchableOpacity>
         <TouchableOpacity onPress={onOpenSettings} style={styles.iconBtn}>
@@ -106,29 +103,34 @@ export default function DashboardHeader({
           <Ionicons
             name={isObdStandby ? "power-outline" : "power-outline"}
             size={18}
-            color={isObdStandby ? "#00ff88" : "#ff4444"}
+            color={isObdStandby ? colors.accent : "#ff4444"}
           />
         </TouchableOpacity>
         <View
           style={[
             styles.statusTag,
-            { backgroundColor: isConnected ? "#00ff8822" : "#ff444422" },
+            {
+              backgroundColor: isConnected ? "#00ff8822" : "#ff444422",
+              paddingHorizontal: isPotrait ? 6 : 10,
+            },
           ]}
         >
           <View
             style={[
               styles.dot,
-              { backgroundColor: isConnected ? "#00ff88" : "#ff4444" },
+              { backgroundColor: isConnected ? colors.accent : "#ff4444" },
             ]}
           />
-          <Text
-            style={[
-              styles.statusText,
-              { color: isConnected ? "#00ff88" : "#ff4444" },
-            ]}
-          >
-            {isConnected ? "STABLE" : "OFFLINE"}
-          </Text>
+          {!isPotrait && (
+            <Text
+              style={[
+                styles.statusText,
+                { color: isConnected ? colors.accent : "#ff4444" },
+              ]}
+            >
+              {isConnected ? "STABLE" : "OFFLINE"}
+            </Text>
+          )}
         </View>
       </View>
     </View>

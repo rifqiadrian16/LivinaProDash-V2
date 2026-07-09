@@ -746,7 +746,7 @@ export default function useDashboard() {
   const handleSetupSecretTap = () => {
     const newCount = bypassTapCount + 1;
     setBypassTapCount(newCount);
-    if (newCount >= 7) {
+    if (newCount >= 3) {
       setIsBypassed(true);
       showAlert("Bypass Active", "Mode Demo diaktifkan.", "success");
     }

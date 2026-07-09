@@ -21,7 +21,7 @@ import { getFuelStyles } from "../../styles/fuel.styles";
 import { getDB } from "../../utils/database";
 
 export default function FuelScreen() {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const styles = getFuelStyles(colors);
   const { showAlert, showConfirm } = useAlert();
   const {
@@ -128,21 +128,24 @@ export default function FuelScreen() {
 
   return (
     <SafeAreaView
-      style={[styles.container, isTabletLandscape && { paddingHorizontal: 25 }]}
+      style={[
+        styles.container,
+        { paddingHorizontal: isPhoneLandscape ? 35 : 25 },
+      ]}
       edges={["top"]}
     >
       <ScrollView
         style={{
           flex: 1,
           marginBottom: isPhoneLandscape
-            ? insets.bottom + 40
+            ? insets.bottom + 30
             : insets.bottom + 80,
         }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.headerTitle}>
-          FUEL <Text style={{ color: "#00ff88" }}>CONSUMPTION</Text>
+          FUEL <Text style={{ color: colors.accent }}>CONSUMPTION</Text>
         </Text>
 
         {/* INSTANT FUEL - HERO */}

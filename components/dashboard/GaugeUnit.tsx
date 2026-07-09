@@ -12,6 +12,7 @@ import Svg, {
   Stop,
   Text as SvgText,
 } from "react-native-svg";
+import { useAppTheme } from "../../components/AppThemeContext";
 import { GaugeLayout } from "../../constants/gaugeThemes";
 
 const REDLINE_COLOR = "#FF3B30";
@@ -54,6 +55,7 @@ interface GaugeUnitProps {
   // menampilkan angka kecil (mis. Speed) di dalam gauge, tanpa gauge kedua.
   insetValue?: number | string;
   insetUnit?: string;
+  tickFontSizeFactor?: number;
 }
 
 const GaugeUnit = memo(
@@ -75,6 +77,7 @@ const GaugeUnit = memo(
     style,
     insetValue,
     insetUnit,
+    tickFontSizeFactor,
   }: GaugeUnitProps) => {
     const { width, height } = useWindowDimensions();
     const isTabletLandscape = width > height && height >= 480;
@@ -86,6 +89,16 @@ const GaugeUnit = memo(
     const activeColor = isRedline ? REDLINE_COLOR : color;
     const activeNeedle = isRedline ? REDLINE_COLOR : needleColor;
 
+    const { isDark } = useAppTheme();
+    const trackBg = isDark ? "#1a1a1a" : "#E5E5EA"; // Lintasan abu-abu
+    const panelBg = isDark ? "#050505" : "#FFFFFF"; // Kotak Digital
+    const borderColor = isDark ? "#222" : "#D1D1D6"; // Garis luar Digital
+    const textColor = isDark ? "#fff" : "#1C1C1E"; // Teks Angka Utama
+    const subText = isDark ? "#cccccc" : "#8E8E93"; // Teks Label/Tick
+    const gradMid1 = isDark ? "rgb(245, 233, 184)" : color; // Di Light Mode, pertahankan warna utama lebih lama
+    const gradMid2 = isDark ? "#FF9900" : "#C0392B"; // Dark: Oren. Light: Merah Bata (Crimson)
+    const gridColor = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)";
+
     // =========================================================
     // LAYOUT: ARC — setengah lingkaran + jarum (gaya lama/klasik)
     // =========================================================
@@ -93,7 +106,7 @@ const GaugeUnit = memo(
       const size = radius * 2 + 40;
       const cx = size / 2;
       const cy = size / 2;
-      const strokeWidth = Math.max(3, radius * 0.035);
+      const strokeWidth = Math.max(3, radius * 0.055);
       const startAngle = -90;
       const sweepAngle = 180;
       const endAngle = startAngle + (safeValue / max) * sweepAngle;
@@ -101,7 +114,16 @@ const GaugeUnit = memo(
         redlineFrom !== undefined
           ? startAngle + (redlineFrom / max) * sweepAngle
           : undefined;
-      const tickFontSize = Math.max(9, radius * 0.1);
+
+      const isHpLandscape = width > height && height < 480;
+      const minFontSize = isHpLandscape ? 7 : 9;
+      const fontFactor = isHpLandscape ? 0.065 : 0.1;
+
+      const tickFontSize = Math.max(
+        minFontSize,
+        radius * (tickFontSizeFactor ?? fontFactor),
+      );
+      // 👆 SAMPAI SINI
       const needleLen = radius - 12;
 
       // ✅ GRADASI: sama seperti tema Full Ring — putih/warna dasar → oren → merah
@@ -127,12 +149,8 @@ const GaugeUnit = memo(
                   gradientUnits="userSpaceOnUse"
                 >
                   <Stop offset="0%" stopColor={color} stopOpacity="1" />
-                  <Stop
-                    offset="25%"
-                    stopColor="rgb(245, 233, 184)"
-                    stopOpacity="1"
-                  />
-                  <Stop offset="50%" stopColor="#FF9900" stopOpacity="1" />
+                  <Stop offset="25%" stopColor={gradMid1} stopOpacity="1" />
+                  <Stop offset="50%" stopColor={gradMid2} stopOpacity="1" />
                   <Stop offset="80%" stopColor="#FF3B30" stopOpacity="1" />
                   <Stop
                     offset="100%"
@@ -172,7 +190,7 @@ const GaugeUnit = memo(
                   <SvgText
                     x={textP.x}
                     y={textP.y}
-                    fill={isRedZone ? REDLINE_COLOR : "#cccccc"}
+                    fill={isRedZone ? REDLINE_COLOR : subText}
                     fontSize={tickFontSize}
                     fontWeight="bold"
                     textAnchor="middle"
@@ -186,7 +204,7 @@ const GaugeUnit = memo(
             <Path
               d={arcPath(cx, cy, startAngle, startAngle + sweepAngle, radius)}
               fill="none"
-              stroke="#1a1a1a"
+              stroke={trackBg}
               strokeWidth={strokeWidth}
               strokeLinecap="round"
             />
@@ -236,7 +254,7 @@ const GaugeUnit = memo(
               <SvgText
                 x={cx}
                 y={cy - radius * 0.32}
-                fill="#eeeeee"
+                fill={textColor}
                 fontSize={40}
                 fontWeight="900"
                 textAnchor="middle"
@@ -293,12 +311,8 @@ const GaugeUnit = memo(
                     y2="0%"
                   >
                     <Stop offset="0%" stopColor={color} stopOpacity="1" />
-                    <Stop
-                      offset="50%"
-                      stopColor="rgb(245, 233, 184)"
-                      stopOpacity="1"
-                    />
-                    <Stop offset="100%" stopColor="#FF9900" stopOpacity="1" />
+                    <Stop offset="50%" stopColor={gradMid1} stopOpacity="1" />
+                    <Stop offset="100%" stopColor={gradMid2} stopOpacity="1" />
                   </LinearGradient>
 
                   {/* Gradasi Kiri: Menyapu dari Jam 6 (Oren) ke Redline (Merah) */}
@@ -309,7 +323,7 @@ const GaugeUnit = memo(
                     x2="0%"
                     y2="0%"
                   >
-                    <Stop offset="0%" stopColor="#FF9900" stopOpacity="1" />
+                    <Stop offset="0%" stopColor={gradMid2} stopOpacity="1" />
                     <Stop offset="60%" stopColor="#FF3B30" stopOpacity="1" />
                     <Stop
                       offset="100%"
@@ -326,7 +340,7 @@ const GaugeUnit = memo(
                   cx={cx}
                   cy={cy}
                   r={radius}
-                  stroke="#1a1a1a"
+                  stroke={trackBg}
                   strokeWidth={strokeWidth}
                   fill="none"
                 />
@@ -384,12 +398,13 @@ const GaugeUnit = memo(
               <Text
                 style={[
                   styles.valueDigitsRing,
-                  { color: isRedline ? REDLINE_COLOR : "#fff" },
-                  glow && {
-                    textShadowColor: activeColor,
-                    textShadowRadius: 12,
-                    textShadowOffset: { width: 0, height: 0 },
-                  },
+                  { color: isRedline ? REDLINE_COLOR : textColor },
+                  glow &&
+                    isDark && {
+                      textShadowColor: activeColor,
+                      textShadowRadius: 12,
+                      textShadowOffset: { width: 0, height: 0 },
+                    },
                 ]}
               >
                 {displayValue}
@@ -443,12 +458,8 @@ const GaugeUnit = memo(
                   gradientUnits="userSpaceOnUse"
                 >
                   <Stop offset="0%" stopColor={color} stopOpacity="1" />
-                  <Stop
-                    offset="25%"
-                    stopColor="rgb(245, 233, 184)"
-                    stopOpacity="1"
-                  />
-                  <Stop offset="50%" stopColor="#FF9900" stopOpacity="1" />
+                  <Stop offset="25%" stopColor={gradMid1} stopOpacity="1" />
+                  <Stop offset="50%" stopColor={gradMid2} stopOpacity="1" />
                   <Stop offset="80%" stopColor="#FF3B30" stopOpacity="1" />
                   <Stop
                     offset="100%"
@@ -464,7 +475,7 @@ const GaugeUnit = memo(
               width={barWidth}
               height={barHeight}
               rx={barHeight / 2}
-              fill="#1a1a1a"
+              fill={trackBg}
             />
             {redlineProgress !== undefined && (
               <Rect
@@ -530,8 +541,8 @@ const GaugeUnit = memo(
           styles.digitalPanel,
           {
             width: panelWidth,
-            borderColor: isRedline ? REDLINE_COLOR : "#222",
-            // TINGGI KOTAK DINAMIS: Tablet 40, HP 12
+            borderColor: isRedline ? REDLINE_COLOR : borderColor, // ✅
+            backgroundColor: panelBg,
             paddingVertical: isTabletLandscape ? 40 : 12,
           },
           style,
@@ -542,13 +553,19 @@ const GaugeUnit = memo(
             {[...Array(4)].map((_, i) => (
               <View
                 key={`h-${i}`}
-                style={[styles.gridLineH, { top: `${(i + 1) * 20}%` }]}
+                style={[
+                  styles.gridLineH,
+                  { top: `${(i + 1) * 20}%`, backgroundColor: gridColor },
+                ]}
               />
             ))}
             {[...Array(4)].map((_, i) => (
               <View
                 key={`v-${i}`}
-                style={[styles.gridLineV, { left: `${(i + 1) * 20}%` }]}
+                style={[
+                  styles.gridLineV,
+                  { left: `${(i + 1) * 20}%`, backgroundColor: gridColor },
+                ]}
               />
             ))}
           </View>
@@ -567,7 +584,7 @@ const GaugeUnit = memo(
         <Text
           style={[
             styles.digitalValue,
-            { color: isRedline ? REDLINE_COLOR : color, fontFamily },
+            { color: isRedline ? REDLINE_COLOR : textColor, fontFamily },
             glow && {
               textShadowColor: isRedline ? REDLINE_COLOR : color,
               textShadowRadius: 14,
@@ -583,6 +600,7 @@ const GaugeUnit = memo(
         <View
           style={[
             styles.digitalBarTrack,
+            { backgroundColor: trackBg },
             isTabletLandscape && { marginTop: 24 },
           ]}
         >

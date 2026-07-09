@@ -22,6 +22,7 @@ export const getTripStyles = (c: AppColors) =>
       borderRadius: 50,
       borderWidth: 1,
       borderColor: c.border,
+      marginTop: 10,
     },
 
     summaryCard: {

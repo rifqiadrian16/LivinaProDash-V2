@@ -55,7 +55,7 @@ export default function SettingsModal({
   hudMirrorEnabled,
   onToggleHudMirror,
 }: any) {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const styles = getDashboardStyles(colors);
   const [secretTapCount, setSecretTapCount] = useState(0);
   const keyboardOffset = useRef(new Animated.Value(0)).current;
@@ -189,7 +189,9 @@ export default function SettingsModal({
                   <Text
                     style={[
                       styles.tabText,
-                      obdType === "bluetooth" && { color: "#fff" },
+                      obdType === "bluetooth" && {
+                        color: isDark ? "#000" : "#fff",
+                      },
                       isPhoneLandscape && { fontSize: 12 },
                     ]}
                   >
@@ -207,7 +209,7 @@ export default function SettingsModal({
                   <Text
                     style={[
                       styles.tabText,
-                      obdType === "wifi" && { color: "#000" },
+                      obdType === "wifi" && { color: isDark ? "#000" : "#fff" },
                       isPhoneLandscape && { fontSize: 12 },
                     ]}
                   >
@@ -240,7 +242,11 @@ export default function SettingsModal({
                       style={styles.scanBtnMini}
                       onPress={() => onStartScan("bluetooth")}
                     >
-                      <Ionicons name="search" size={20} color="#000" />
+                      <Ionicons
+                        name="search"
+                        size={20}
+                        color={isDark ? "#000" : "#fff"}
+                      />
                     </TouchableOpacity>
                   </View>
                   <Text
@@ -298,7 +304,11 @@ export default function SettingsModal({
                       style={styles.scanBtnMini}
                       onPress={() => onStartScan("wifi")}
                     >
-                      <Ionicons name="search" size={20} color="#000" />
+                      <Ionicons
+                        name="search"
+                        size={20}
+                        color={isDark ? "#000" : "#FFF"}
+                      />
                     </TouchableOpacity>
                   </View>
                   <View style={{ flexDirection: "row", gap: 10 }}>
@@ -367,11 +377,10 @@ export default function SettingsModal({
                 >
                   <View>
                     <Text
-                      style={{
-                        color: "#fff",
-                        fontWeight: "bold",
-                        fontSize: isPhoneLandscape ? 13 : 14,
-                      }}
+                      style={[
+                        styles.doorLockLabel,
+                        { fontSize: isPhoneLandscape ? 13 : 14 },
+                      ]}
                     >
                       Auto Door Lock
                     </Text>
@@ -386,7 +395,7 @@ export default function SettingsModal({
                       sendMessage(nextState ? "AUTOLOCK_ON" : "AUTOLOCK_OFF");
                     }}
                     style={{
-                      backgroundColor: autoLock ? "#00ff88" : "#333",
+                      backgroundColor: autoLock ? colors.accent : "#333",
                       paddingHorizontal: 12,
                       paddingVertical: 6,
                       borderRadius: 20,
@@ -394,7 +403,7 @@ export default function SettingsModal({
                   >
                     <Text
                       style={{
-                        color: "#000",
+                        color: isDark ? "#000" : "#FFF",
                         fontSize: 10,
                         fontWeight: "bold",
                       }}
@@ -430,7 +439,7 @@ export default function SettingsModal({
                         <Ionicons
                           name="speedometer-outline"
                           size={20}
-                          color="#000"
+                          color={isDark ? "#000" : "#fff"}
                         />
                       </View>
                     </View>
@@ -456,11 +465,10 @@ export default function SettingsModal({
                 >
                   <View style={{ flex: 1, marginRight: 10 }}>
                     <Text
-                      style={{
-                        color: "#fff",
-                        fontWeight: "bold",
-                        fontSize: isPhoneLandscape ? 13 : 14,
-                      }}
+                      style={[
+                        styles.doorLockLabel,
+                        { fontSize: isPhoneLandscape ? 13 : 14 },
+                      ]}
                     >
                       Mode Tampilan HUD
                     </Text>
@@ -502,12 +510,10 @@ export default function SettingsModal({
                 }}
               >
                 <Text
-                  style={{
-                    color: "#fff",
-                    fontWeight: "bold",
-                    marginBottom: 4,
-                    fontSize: isPhoneLandscape ? 13 : 14,
-                  }}
+                  style={[
+                    styles.doorLockLabel,
+                    { fontSize: isPhoneLandscape ? 13 : 14, marginBottom: 4 },
+                  ]}
                 >
                   Tema Gauge
                 </Text>
@@ -536,9 +542,10 @@ export default function SettingsModal({
                         paddingVertical: isPhoneLandscape ? 6 : 8,
                         borderRadius: 8,
                         borderWidth: 1,
-                        borderColor: themeIndex === idx ? t.rpmColor : "#333",
+                        borderColor:
+                          themeIndex === idx ? colors.text : colors.border,
                         backgroundColor:
-                          themeIndex === idx ? "#1a1a1a" : "#000",
+                          themeIndex === idx ? colors.card : colors.inputBg,
                         flexDirection: "row",
                         alignItems: "center",
                         gap: 6,
@@ -547,9 +554,11 @@ export default function SettingsModal({
                       <Ionicons
                         name={LAYOUT_ICON[t.layout] || "apps-outline"}
                         size={14}
-                        color={themeIndex === idx ? t.rpmColor : "#666"}
+                        color={
+                          themeIndex === idx ? colors.text : colors.textMuted
+                        }
                       />
-                      <View
+                      {/* <View
                         style={{
                           width: 9,
                           height: 9,
@@ -564,10 +573,11 @@ export default function SettingsModal({
                           borderRadius: 5,
                           backgroundColor: t.speedColor,
                         }}
-                      />
+                      /> */}
                       <Text
                         style={{
-                          color: themeIndex === idx ? "#fff" : "#888",
+                          color:
+                            themeIndex === idx ? colors.text : colors.textMuted,
                           fontSize: 11,
                           fontWeight: "bold",
                         }}

@@ -9,6 +9,9 @@ export interface AppColors {
   border: string;
   inputBg: string;
   overlay: string;
+  label: string;
+  brand: string;
+  o2: string;
 }
 
 export const DARK_COLORS: AppColors = {
@@ -22,10 +25,13 @@ export const DARK_COLORS: AppColors = {
   border: "#222222",
   inputBg: "#000000",
   overlay: "rgba(0,0,0,0.85)",
+  label: "#000",
+  brand: "#FFF",
+  o2: "#FFF",
 };
 
 export const LIGHT_COLORS: AppColors = {
-  bg: "#f2f2f5",
+  bg: "#f1f1f2",
   card: "#ffffff",
   cardBorder: "#e3e3e8",
   text: "#111111",
@@ -35,4 +41,7 @@ export const LIGHT_COLORS: AppColors = {
   border: "#dcdce0",
   inputBg: "#f7f7f9",
   overlay: "rgba(0,0,0,0.4)",
+  label: "#FFF",
+  brand: "#009e63",
+  o2: "#222",
 };

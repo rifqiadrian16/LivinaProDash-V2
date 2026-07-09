@@ -36,7 +36,7 @@ export const getDashboardStyles = (c: AppColors) =>
       alignItems: "center",
     },
     connectBtnText: {
-      color: "#000",
+      color: c.bg,
       fontSize: 16,
       fontWeight: "900",
       letterSpacing: 1,
@@ -50,12 +50,12 @@ export const getDashboardStyles = (c: AppColors) =>
       marginBottom: 15,
     },
     brandText: {
-      color: c.text,
+      color: c.brand,
       fontSize: 18,
       fontWeight: "900",
       letterSpacing: 2,
     },
-    headerRight: { flexDirection: "row", alignItems: "center", gap: 10 },
+    headerRight: { flexDirection: "row", alignItems: "center" },
     iconBtn: {
       padding: 6,
       borderRadius: 20,
@@ -100,6 +100,11 @@ export const getDashboardStyles = (c: AppColors) =>
     tabActive: { backgroundColor: c.accent },
     tabText: { color: c.textMuted, fontWeight: "bold" },
 
+    doorLockLabel: {
+      color: c.textMuted,
+      fontWeight: "bold",
+    },
+
     configLabel: {
       color: c.textMuted,
       fontSize: 10,
@@ -132,7 +137,7 @@ export const getDashboardStyles = (c: AppColors) =>
       alignItems: "center",
       marginTop: 10,
     },
-    saveBtnText: { color: "#000", fontWeight: "bold", letterSpacing: 1 },
+    saveBtnText: { color: c.label, fontWeight: "bold", letterSpacing: 1 },
 
     // MODAL RADAR
     scannedItem: {

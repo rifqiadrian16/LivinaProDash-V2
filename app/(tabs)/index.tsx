@@ -37,7 +37,7 @@ import SaveTripModal from "../../components/trip/SaveTripModal";
 import { getDashboardStyles } from "../../styles/dashboard.styles";
 
 export default function DashboardScreen() {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const styles = getDashboardStyles(colors);
   const { state, actions } = useDashboard();
 
@@ -99,7 +99,7 @@ export default function DashboardScreen() {
         currentRpm += (targetRpm - currentRpm) * easing;
 
         // 3. TAMBAHKAN SENSOR NOISE / JITTER KHAS OBD2
-        const jitterRpm = currentRpm + (Math.random() * 60 - 30); // Acak ±30 RPM
+        const jitterRpm = Math.round(currentRpm + (Math.random() * 60 - 30));
 
         // 4. SIMULASI SPEED (Terkait dengan fase gas)
         if (phase === "ACCEL") {
@@ -111,7 +111,7 @@ export default function DashboardScreen() {
         if (currentSpeed > 220) currentSpeed = 220;
 
         // Noise kecil untuk Speed
-        const jitterSpeed = currentSpeed + (Math.random() * 2 - 1);
+        const jitterSpeed = Math.round(currentSpeed + (Math.random() * 2 - 1));
 
         // Update State
         setTestRpm(Math.max(0, jitterRpm));
@@ -144,7 +144,7 @@ export default function DashboardScreen() {
       // tidak disentuh sama sekali.
       // ====================================================
       if (isLandscape) {
-        const horizontalPadding = isTabletLandscape ? 35 : 8;
+        const horizontalPadding = isTabletLandscape ? 35 : 0;
         return (
           // BUNGKUSAN UTAMA: Mengatur urutan dari Atas ke Bawah
           <View style={{ flex: 1, paddingTop: 8 }}>
@@ -223,7 +223,7 @@ export default function DashboardScreen() {
       return (
         <ScrollView
           style={styles.container}
-          contentContainerStyle={{ paddingBottom: 120 }}
+          contentContainerStyle={{ paddingBottom: 0 }}
           showsVerticalScrollIndicator={false}
         >
           <DashboardHeader
@@ -343,7 +343,17 @@ export default function DashboardScreen() {
               name={state.isRecording ? "stop" : "videocam"}
               size={state.isFabOpen ? 28 : 13}
               color={
-                state.isRecording ? "#fff" : state.isFabOpen ? "#000" : "#000"
+                state.isRecording
+                  ? isDark
+                    ? "#fff"
+                    : "#000"
+                  : state.isFabOpen
+                    ? isDark
+                      ? "#000"
+                      : "#FFF"
+                    : isDark
+                      ? "#000"
+                      : "#FFF"
               }
               style={!state.isFabOpen && { position: "absolute", left: 6 }}
             />

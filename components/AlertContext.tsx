@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { createContext, useContext, useState } from "react";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { AppColors } from "../constants/appThemes";
+import { useAppTheme } from "./AppThemeContext";
 
 // 1. Buat Context
 const AlertContext = createContext<any>(null);
@@ -18,6 +20,9 @@ export const AlertProvider = ({ children }: { children: React.ReactNode }) => {
     message: "",
     type: "error", // 'error' | 'success'
   });
+
+  const { colors } = useAppTheme();
+  const styles = getAlertStyles(colors);
 
   const [confirmConfig, setConfirmConfig] = useState({
     visible: false,
@@ -68,7 +73,7 @@ export const AlertProvider = ({ children }: { children: React.ReactNode }) => {
               styles.alertBox,
               {
                 borderTopColor:
-                  alertConfig.type === "success" ? "#00ff88" : "#ff4444",
+                  alertConfig.type === "success" ? colors.accent : "#ff4444",
               },
             ]}
           >
@@ -77,7 +82,7 @@ export const AlertProvider = ({ children }: { children: React.ReactNode }) => {
                 alertConfig.type === "success" ? "checkmark-circle" : "warning"
               }
               size={56}
-              color={alertConfig.type === "success" ? "#00ff88" : "#ff4444"}
+              color={alertConfig.type === "success" ? colors.accent : "#ff4444"}
             />
             <Text style={styles.alertTitle}>{alertConfig.title}</Text>
             <Text style={styles.alertMessage}>{alertConfig.message}</Text>
@@ -87,7 +92,7 @@ export const AlertProvider = ({ children }: { children: React.ReactNode }) => {
                 styles.alertBtn,
                 {
                   backgroundColor:
-                    alertConfig.type === "success" ? "#00ff88" : "#ff4444",
+                    alertConfig.type === "success" ? colors.accent : "#ff4444",
                 },
               ]}
               onPress={hideAlert}
@@ -136,78 +141,79 @@ export const AlertProvider = ({ children }: { children: React.ReactNode }) => {
 };
 
 // Pindahkan Style Alert ke sini
-const styles = StyleSheet.create({
-  alertOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  alertBox: {
-    width: "80%",
-    backgroundColor: "#1e1e1e",
-    borderRadius: 15,
-    padding: 25,
-    alignItems: "center",
-    borderTopWidth: 5,
-    borderWidth: 1,
-    borderColor: "#333",
-    elevation: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 5,
-  },
-  alertTitle: {
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "900",
-    marginTop: 15,
-    marginBottom: 8,
-    letterSpacing: 1,
-    textAlign: "center",
-  },
-  alertMessage: {
-    color: "#aaa",
-    fontSize: 14,
-    textAlign: "center",
-    marginBottom: 20,
-    lineHeight: 20,
-  },
-  alertBtn: {
-    width: "100%",
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  alertBtnText: {
-    color: "#121212",
-    fontWeight: "900",
-    fontSize: 14,
-    letterSpacing: 1.5,
-  },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    width: "100%",
-    gap: 10, // Memberi jarak antar tombol
-  },
-  cancelBtn: {
-    flex: 1,
-    backgroundColor: "#333",
-  },
-  cancelBtnText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 14,
-  },
-  confirmBtn: {
-    flex: 1,
-    backgroundColor: "#ff4444",
-  },
-  confirmBtnText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 14,
-  },
-});
+const getAlertStyles = (c: AppColors) =>
+  StyleSheet.create({
+    alertOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0, 0, 0, 0.8)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    alertBox: {
+      width: "80%",
+      backgroundColor: c.bg,
+      borderRadius: 15,
+      padding: 25,
+      alignItems: "center",
+      borderTopWidth: 5,
+      borderWidth: 1,
+      borderColor: "#333",
+      elevation: 10,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.5,
+      shadowRadius: 5,
+    },
+    alertTitle: {
+      color: c.text,
+      fontSize: 20,
+      fontWeight: "900",
+      marginTop: 15,
+      marginBottom: 8,
+      letterSpacing: 1,
+      textAlign: "center",
+    },
+    alertMessage: {
+      color: c.textMuted,
+      fontSize: 14,
+      textAlign: "center",
+      marginBottom: 20,
+      lineHeight: 20,
+    },
+    alertBtn: {
+      width: "100%",
+      paddingVertical: 12,
+      borderRadius: 8,
+      alignItems: "center",
+    },
+    alertBtnText: {
+      color: c.label,
+      fontWeight: "900",
+      fontSize: 14,
+      letterSpacing: 1.5,
+    },
+    buttonRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      width: "100%",
+      gap: 10, // Memberi jarak antar tombol
+    },
+    cancelBtn: {
+      flex: 1,
+      backgroundColor: "#333",
+    },
+    cancelBtnText: {
+      color: "#fff",
+      fontWeight: "bold",
+      fontSize: 14,
+    },
+    confirmBtn: {
+      flex: 1,
+      backgroundColor: "#ff4444",
+    },
+    confirmBtnText: {
+      color: "#fff",
+      fontWeight: "bold",
+      fontSize: 14,
+    },
+  });

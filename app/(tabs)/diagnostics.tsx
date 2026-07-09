@@ -254,7 +254,7 @@ export default function DiagnosticsScreen() {
         style={[
           styles.container,
           {
-            paddingHorizontal: isPhoneLandscape ? 35 : 35,
+            paddingHorizontal: isPhoneLandscape ? 35 : 25,
             flex: 1,
             marginBottom: 20,
           },
@@ -550,7 +550,7 @@ export default function DiagnosticsScreen() {
                 <Text style={styles.infoText}>
                   💡 Tegangan sensor O2 normalnya akan berosilasi naik turun
                   dengan cepat antara{" "}
-                  <Text style={{ color: "#fff", fontWeight: "700" }}>
+                  <Text style={{ color: colors.o2, fontWeight: "700" }}>
                     0.1V s/d 0.9V
                   </Text>{" "}
                   saat mesin berada dalam loop tertutup (Closed Loop).
