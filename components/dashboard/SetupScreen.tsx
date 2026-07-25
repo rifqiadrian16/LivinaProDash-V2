@@ -30,9 +30,9 @@ export default function SetupScreen({
   // HP landscape (bukan tablet/HU) -> paling rawan ketutup secretZone & tab bar
   const isPhoneLandscape = isLandscape && height < 480;
 
-  // ✅ Sisakan ruang ekstra di bawah supaya tombol aman dari navigasi
-  // sistem HP maupun tab bar melayang di bawah.
-  const bottomClearance = isPhoneLandscape ? 90 : isLandscape ? 110 : 40;
+  // ✅ Kurangi clearance bawah khusus untuk Head Unit (isTabletLandscape)
+  // agar tombol naik ke area yang terlihat tanpa merusak HP landscape/portrait.
+  const bottomClearance = isPhoneLandscape ? 90 : isTabletLandscape ? 85 : 40;
 
   // Ikon dan Judul diperbesar agar tidak kekecilan di HP Landscape
   const iconSize = isPhoneLandscape ? 64 : isTabletLandscape ? 90 : 80;
@@ -89,18 +89,18 @@ export default function SetupScreen({
           flexGrow: 1,
           justifyContent: "center",
           paddingHorizontal: isTabletLandscape ? 60 : 20,
-          paddingTop: isPhoneLandscape ? 10 : 60,
+          // ✅ Kurangi padding atas di Head Unit agar elemen tertarik ke atas
+          paddingTop: isPhoneLandscape ? 10 : isTabletLandscape ? 0 : 60,
           paddingBottom: bottomClearance,
         }}
         showsVerticalScrollIndicator={false}
       >
         {isPhoneLandscape ? (
           // =========================================================
-          // LAYOUT HP LANDSCAPE: 2 kolom sejajar
+          // LAYOUT HP LANDSCAPE: 2 kolom sejajar (TIDAK DIUBAH)
           // =========================================================
           <View style={{ flexDirection: "row", alignItems: "center", gap: 20 }}>
             <View style={{ flex: 1, alignItems: "center" }}>
-              {/* [DIKEMBALIKAN] TouchableOpacity dengan onSecretTap aktif kembali! */}
               <TouchableOpacity activeOpacity={1} onPress={onSecretTap}>
                 <Ionicons
                   name="car-sport"
@@ -133,7 +133,6 @@ export default function SetupScreen({
           // =========================================================
           <>
             <View style={styles.headerCentered}>
-              {/* [DIKEMBALIKAN] TouchableOpacity dengan onSecretTap aktif kembali! */}
               <TouchableOpacity activeOpacity={1} onPress={onSecretTap}>
                 <Ionicons
                   name="car-sport"
@@ -150,14 +149,21 @@ export default function SetupScreen({
 
             <View
               style={{
-                marginTop: isTabletLandscape ? 30 : 50,
+                // ✅ Rapatkan jarak antara Header (Ikon/Judul) dengan bagian tombol
+                marginTop: isTabletLandscape ? 15 : 50,
                 alignItems: "center",
                 paddingHorizontal: 20,
                 width: isTabletLandscape ? "60%" : "100%",
                 alignSelf: "center",
               }}
             >
-              <View style={{ marginBottom: 20, width: "100%" }}>
+              {/* ✅ Rapatkan jarak antara teks instruksi dengan tombol */}
+              <View
+                style={{
+                  marginBottom: isTabletLandscape ? 10 : 20,
+                  width: "100%",
+                }}
+              >
                 {instructionText}
               </View>
               {connectButton}

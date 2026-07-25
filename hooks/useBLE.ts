@@ -201,18 +201,29 @@ export default function useBLE(
 
     // 1. CEK IZIN APLIKASI (Android 12+)
     if (Platform.OS === "android") {
-      const granted = await PermissionsAndroid.requestMultiple([
-        PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-        PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-      ]);
-      permissionsGranted =
-        granted["android.permission.BLUETOOTH_CONNECT"] ===
-          PermissionsAndroid.RESULTS.GRANTED &&
-        granted["android.permission.BLUETOOTH_SCAN"] ===
-          PermissionsAndroid.RESULTS.GRANTED &&
-        granted["android.permission.ACCESS_FINE_LOCATION"] ===
-          PermissionsAndroid.RESULTS.GRANTED;
+      const apiLevel = parseInt(Platform.Version.toString(), 10);
+
+      if (apiLevel >= 31) {
+        // Untuk Android 12 ke atas (termasuk Head Unit Android 13)
+        const granted = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        ]);
+        permissionsGranted =
+          granted["android.permission.BLUETOOTH_CONNECT"] ===
+            PermissionsAndroid.RESULTS.GRANTED &&
+          granted["android.permission.BLUETOOTH_SCAN"] ===
+            PermissionsAndroid.RESULTS.GRANTED &&
+          granted["android.permission.ACCESS_FINE_LOCATION"] ===
+            PermissionsAndroid.RESULTS.GRANTED;
+      } else {
+        // Untuk Android 11 ke bawah (Hanya butuh akses lokasi untuk BLE)
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        );
+        permissionsGranted = granted === PermissionsAndroid.RESULTS.GRANTED;
+      }
     }
 
     if (!permissionsGranted) {

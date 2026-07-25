@@ -51,8 +51,6 @@ interface GaugeUnitProps {
   grid?: boolean;
   fontFamily?: string;
   style?: any;
-  // TAMBAHAN: dipakai khusus mode "arc" gabungan (Classic Arc portrait) —
-  // menampilkan angka kecil (mis. Speed) di dalam gauge, tanpa gauge kedua.
   insetValue?: number | string;
   insetUnit?: string;
   tickFontSizeFactor?: number;
@@ -90,17 +88,17 @@ const GaugeUnit = memo(
     const activeNeedle = isRedline ? REDLINE_COLOR : needleColor;
 
     const { isDark } = useAppTheme();
-    const trackBg = isDark ? "#1a1a1a" : "#E5E5EA"; // Lintasan abu-abu
-    const panelBg = isDark ? "#050505" : "#FFFFFF"; // Kotak Digital
-    const borderColor = isDark ? "#222" : "#D1D1D6"; // Garis luar Digital
-    const textColor = isDark ? "#fff" : "#1C1C1E"; // Teks Angka Utama
-    const subText = isDark ? "#cccccc" : "#8E8E93"; // Teks Label/Tick
-    const gradMid1 = isDark ? "rgb(245, 233, 184)" : color; // Di Light Mode, pertahankan warna utama lebih lama
-    const gradMid2 = isDark ? "#FF9900" : "#C0392B"; // Dark: Oren. Light: Merah Bata (Crimson)
+    const trackBg = isDark ? "#1a1a1a" : "#E5E5EA";
+    const panelBg = isDark ? "#050505" : "#FFFFFF";
+    const borderColor = isDark ? "#222" : "#D1D1D6";
+    const textColor = isDark ? "#fff" : "#1C1C1E";
+    const subText = isDark ? "#cccccc" : "#8E8E93";
+    const gradMid1 = isDark ? "rgb(245, 233, 184)" : color;
+    const gradMid2 = isDark ? "#FF9900" : "#C0392B";
     const gridColor = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)";
 
     // =========================================================
-    // LAYOUT: ARC — setengah lingkaran + jarum (gaya lama/klasik)
+    // LAYOUT: ARC
     // =========================================================
     if (layout === "arc") {
       const size = radius * 2 + 40;
@@ -123,12 +121,7 @@ const GaugeUnit = memo(
         minFontSize,
         radius * (tickFontSizeFactor ?? fontFactor),
       );
-      // 👆 SAMPAI SINI
       const needleLen = radius - 12;
-
-      // ✅ GRADASI: sama seperti tema Full Ring — putih/warna dasar → oren → merah
-      // di redline. Hanya dipasang kalau gauge ini punya redline (RPM),
-      // gauge tanpa redline (Speed) tetap solid color seperti biasa.
       const hasRedline = redlineFrom !== undefined;
       const arcGradId = `arc-grad-${unitLabel}`;
 
@@ -137,9 +130,6 @@ const GaugeUnit = memo(
           <Svg width={size} height={size / 2 + 26}>
             {hasRedline && (
               <Defs>
-                {/* userSpaceOnUse + koordinat FIX (bukan relatif ke path
-                yang sedang tumbuh) supaya warna di posisi X tertentu selalu
-                sama persis, tidak "meregang" waktu jarum masih pendek. */}
                 <LinearGradient
                   id={arcGradId}
                   x1={cx - radius}
@@ -246,10 +236,6 @@ const GaugeUnit = memo(
               <Circle cx={cx} cy={cy} r={2} fill="#000" />
             </G>
 
-            {/* ✅ TAMBAHAN: angka kecil (mis. Speed) di ruang kosong bawah
-            pivot jarum — jarum semi-circle ini hanya menyapu bagian ATAS
-            (angle -90..+90 dari titik atas), jadi area bawah pivot aman
-            dipakai untuk insert digital kecil tanpa ketiban jarum. */}
             {insetValue !== undefined && insetValue !== null && (
               <SvgText
                 x={cx}
@@ -270,7 +256,7 @@ const GaugeUnit = memo(
     }
 
     // =========================================================
-    // LAYOUT: RING — lingkaran penuh 360°, progress donut
+    // LAYOUT: RING
     // =========================================================
     if (layout === "ring") {
       const size = radius * 2 + 24;
@@ -282,16 +268,13 @@ const GaugeUnit = memo(
       const redlineProgress =
         redlineFrom !== undefined ? redlineFrom / max : undefined;
 
-      // 1. Logika Pembelahan Semicircle (Kanan & Kiri)
       const isRpmGauge = redlineFrom !== undefined;
       const gradRightId = `grad-right-${unitLabel}`;
       const gradLeftId = `grad-left-${unitLabel}`;
 
-      // Progress untuk setengah lingkaran kanan (Jam 12 ke Jam 6) — maksimal 0.5 (50%)
       const progRight = Math.min(progress, 0.5);
       const dashOffsetRight = circumference * (1 - progRight);
 
-      // Progress untuk setengah lingkaran kiri (Jam 6 ke Jam 12) — aktif jika progress > 50%
       const progLeft = progress > 0.5 ? progress - 0.5 : 0;
       const dashOffsetLeft = circumference * (1 - progLeft);
 
@@ -299,10 +282,8 @@ const GaugeUnit = memo(
         <View style={[styles.cluster, style]}>
           <View style={{ width: size, height: size }}>
             <Svg width={size} height={size}>
-              {/* 2. Definisi 2 Gradasi (Kanan: Putih->Oren, Kiri: Oren->Merah) */}
               {isRpmGauge && (
                 <Defs>
-                  {/* Gradasi Kanan: Menyapu dari Jam 12 (Putih) ke Jam 6 (Oren) */}
                   <LinearGradient
                     id={gradRightId}
                     x1="100%"
@@ -314,8 +295,6 @@ const GaugeUnit = memo(
                     <Stop offset="50%" stopColor={gradMid1} stopOpacity="1" />
                     <Stop offset="100%" stopColor={gradMid2} stopOpacity="1" />
                   </LinearGradient>
-
-                  {/* Gradasi Kiri: Menyapu dari Jam 6 (Oren) ke Redline (Merah) */}
                   <LinearGradient
                     id={gradLeftId}
                     x1="100%"
@@ -334,7 +313,6 @@ const GaugeUnit = memo(
                 </Defs>
               )}
 
-              {/* 3. Background Track Hitam & Redline Zone */}
               <G transform={`rotate(-90, ${cx}, ${cy})`}>
                 <Circle
                   cx={cx}
@@ -359,7 +337,6 @@ const GaugeUnit = memo(
                 )}
               </G>
 
-              {/* 4. Semicircle KANAN (Jam 12 ke Jam 6) */}
               {progress > 0 && (
                 <G transform={`rotate(-90, ${cx}, ${cy})`}>
                   <Circle
@@ -376,7 +353,6 @@ const GaugeUnit = memo(
                 </G>
               )}
 
-              {/* 5. Semicircle KIRI (Jam 6 ke Jam 12) — Aktif setelah 50% RPM */}
               {progress > 0.5 && (
                 <G transform={`rotate(90, ${cx}, ${cy})`}>
                   <Circle
@@ -418,7 +394,7 @@ const GaugeUnit = memo(
     }
 
     // =========================================================
-    // LAYOUT: BAR — linear minimalis, tanpa lingkaran
+    // LAYOUT: BAR
     // =========================================================
     if (layout === "bar") {
       const barWidth = radius * 2.2;
@@ -442,10 +418,6 @@ const GaugeUnit = memo(
               <Text style={styles.valueUnit}> {unitLabel}</Text>
             </Text>
           </View>
-          {/* ✅ GRADASI: sama seperti tema Full Ring & Classic Arc — putih/warna
-          dasar → oren → merah di redline. userSpaceOnUse dgn koordinat FIX
-          (0 s/d barWidth) supaya warna di posisi X tertentu konsisten,
-          tidak "meregang" waktu bar masih pendek. */}
           <Svg width={barWidth} height={barHeight}>
             {hasRedline && (
               <Defs>
@@ -497,9 +469,6 @@ const GaugeUnit = memo(
               />
             )}
           </Svg>
-          {/* ✅ FIX: tiap label tick dikasih flex:1 + alignment kiri/tengah/
-          kanan sesuai posisinya, supaya "0 1 2 3 4 5 6 7 8" sejajar rapi
-          dengan track di bawahnya dan angka ujung tidak kepotong/mepet. */}
           <View style={[styles.barTicksRow, { width: barWidth }]}>
             {tickValues.map((t, i) => {
               const pct = t / max;
@@ -531,7 +500,7 @@ const GaugeUnit = memo(
     }
 
     // =========================================================
-    // LAYOUT: DIGITAL — panel LCD, angka besar + grid/glow opsional
+    // LAYOUT: DIGITAL — panel LCD
     // =========================================================
     const panelWidth = radius * 2.2;
     const progress = safeValue / max;
@@ -541,9 +510,10 @@ const GaugeUnit = memo(
           styles.digitalPanel,
           {
             width: panelWidth,
-            borderColor: isRedline ? REDLINE_COLOR : borderColor, // ✅
+            borderColor: isRedline ? REDLINE_COLOR : borderColor,
             backgroundColor: panelBg,
-            paddingVertical: isTabletLandscape ? 40 : 12,
+            // ✅ paddingVertical dirapatkan (dari 40 menjadi 16) untuk HU/Tablet
+            paddingVertical: isTabletLandscape ? 16 : 12,
           },
           style,
         ]}
@@ -571,11 +541,11 @@ const GaugeUnit = memo(
           </View>
         )}
 
-        {/* JARAK JUDUL DINAMIS */}
         <Text
           style={[
             styles.digitalTitle,
-            isTabletLandscape && { marginBottom: 12 },
+            // ✅ Margin bawah dirapatkan (dari 12 menjadi 4) untuk HU/Tablet
+            isTabletLandscape && { marginBottom: 4 },
           ]}
         >
           {title}
@@ -596,12 +566,12 @@ const GaugeUnit = memo(
           <Text style={styles.digitalUnit}> {unitLabel}</Text>
         </Text>
 
-        {/* JARAK GARIS BAWAH DINAMIS */}
         <View
           style={[
             styles.digitalBarTrack,
             { backgroundColor: trackBg },
-            isTabletLandscape && { marginTop: 24 },
+            // ✅ Margin atas dirapatkan (dari 24 menjadi 12) untuk HU/Tablet
+            isTabletLandscape && { marginTop: 12 },
           ]}
         >
           <View

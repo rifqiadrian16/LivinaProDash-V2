@@ -69,8 +69,6 @@ export default function SettingsModal({
 
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
-  // ✅ Bedakan HP landscape (layar pendek) vs Tablet/Head Unit landscape,
-  // supaya modal tidak numpuk/overflow di HP yang diputar.
   const isTabletLandscape = isLandscape && height >= 480;
   const isPhoneLandscape = isLandscape && height < 480;
 
@@ -111,14 +109,13 @@ export default function SettingsModal({
     }
   }, [visible]);
 
-  // ✅ Tinggi maksimum area scroll dihitung dinamis dari tinggi layar,
-  // bukan angka fix — supaya di HP landscape (tinggi ~360-420px) modal
-  // tidak overflow ke luar layar atau ketiban keyboard.
+  // ✅ Tinggi maksimum area scroll selalu dihitung BERDASARKAN TINGGI LAYAR.
+  // Ini menjamin modal TIDAK AKAN PERNAH menembus batas bawah layar.
   const scrollMaxHeight = isPhoneLandscape
     ? height * 0.65
     : isTabletLandscape
-      ? 450
-      : 650;
+      ? height * 0.7 // Untuk head unit landscape, gunakan 75% tinggi layarnya
+      : height * 0.7; // Untuk HP portrait
 
   const sectionSpacing = isPhoneLandscape ? 12 : 20;
   const labelFontSize = isPhoneLandscape ? 11 : 13;
@@ -132,11 +129,13 @@ export default function SettingsModal({
             style={[
               styles.modalBox,
               { transform: [{ translateY: keyboardOffset }] },
-              isPhoneLandscape && {
-                width: "94%",
+              // ✅ Beri batasan tinggi agar boks modal tidak lebih dari 90% layar
+              {
+                maxHeight: height * 0.9,
+                width: isPhoneLandscape || isTabletLandscape ? "94%" : "100%",
                 maxWidth: 640,
-                padding: 16,
               },
+              (isPhoneLandscape || isTabletLandscape) && { padding: 16 },
             ]}
           >
             <View
@@ -558,22 +557,6 @@ export default function SettingsModal({
                           themeIndex === idx ? colors.text : colors.textMuted
                         }
                       />
-                      {/* <View
-                        style={{
-                          width: 9,
-                          height: 9,
-                          borderRadius: 5,
-                          backgroundColor: t.rpmColor,
-                        }}
-                      />
-                      <View
-                        style={{
-                          width: 9,
-                          height: 9,
-                          borderRadius: 5,
-                          backgroundColor: t.speedColor,
-                        }}
-                      /> */}
                       <Text
                         style={{
                           color:
@@ -691,7 +674,7 @@ export default function SettingsModal({
                   maxHeight: isPhoneLandscape
                     ? height * 0.45
                     : isTabletLandscape
-                      ? 140
+                      ? height * 0.5 // ✅ Scanner juga diubah ke persentase
                       : 250,
                 }}
                 showsVerticalScrollIndicator={true}
