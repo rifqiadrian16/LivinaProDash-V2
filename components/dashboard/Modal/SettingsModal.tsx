@@ -13,6 +13,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import { ALARM_SOUND_PRESETS } from "../../../constants/alarmSounds";
 import { getDashboardStyles } from "../../../styles/dashboard.styles";
 import { useAppTheme } from "../../AppThemeContext";
 import { useGaugeTheme } from "../../GaugeThemeContext";
@@ -54,6 +55,18 @@ export default function SettingsModal({
   sendMessage,
   hudMirrorEnabled,
   onToggleHudMirror,
+  tempAlarmEnabled,
+  setTempAlarmEnabled,
+  tempAlarmThreshold,
+  setTempAlarmThreshold,
+  onTestTempAlarm,
+  alarmSoundId,
+  customSoundName,
+  setAlarmSoundId,
+  pickCustomAlarmSound,
+  previewAlarmSound,
+  isSimulatingTemp,
+  onSimulateTempRamp,
 }: any) {
   const { colors, isDark } = useAppTheme();
   const styles = getDashboardStyles(colors);
@@ -446,6 +459,269 @@ export default function SettingsModal({
                 )}
               </View>
 
+              {/* ALARM SUHU MESIN */}
+              <View
+                style={{
+                  borderTopWidth: 1,
+                  borderTopColor: "#222",
+                  paddingTop: isPhoneLandscape ? 10 : 20,
+                  marginBottom: sectionSpacing,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: isPhoneLandscape ? 8 : 15,
+                  }}
+                >
+                  <View>
+                    <Text
+                      style={[
+                        styles.doorLockLabel,
+                        { fontSize: isPhoneLandscape ? 13 : 14 },
+                      ]}
+                    >
+                      Alarm Suhu Mesin
+                    </Text>
+                    <Text style={{ color: "#666", fontSize: 10 }}>
+                      Peringatkan saat suhu coolant terlalu panas
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setTempAlarmEnabled(!tempAlarmEnabled)}
+                    style={{
+                      backgroundColor: tempAlarmEnabled
+                        ? colors.accent
+                        : "#333",
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 20,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: colors.bg,
+                        fontSize: 10,
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {tempAlarmEnabled ? "ON" : "OFF"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {tempAlarmEnabled && (
+                  <View>
+                    <Text
+                      style={[styles.configLabel, { fontSize: labelFontSize }]}
+                    >
+                      AKTIFKAN ALARM PADA SUHU (°C)
+                    </Text>
+                    <View
+                      style={{ flexDirection: "row", gap: 10, marginTop: 5 }}
+                    >
+                      <TextInput
+                        style={[
+                          styles.configInput,
+                          { flex: 1 },
+                          isPhoneLandscape && { padding: 10, fontSize: 13 },
+                        ]}
+                        value={tempAlarmThreshold}
+                        onChangeText={(val) =>
+                          setTempAlarmThreshold(val.replace(/[^0-9]/g, ""))
+                        }
+                        keyboardType="numeric"
+                        placeholder="100"
+                        placeholderTextColor="#444"
+                      />
+                      <View style={styles.scanBtnMini}>
+                        <Ionicons
+                          name="thermometer-outline"
+                          size={20}
+                          color={isDark ? "#000" : "#fff"}
+                        />
+                      </View>
+                    </View>
+
+                    {/* ⬇️⬇️⬇️ SISIPKAN SELURUH BLOK "SUARA ALARM" DI SINI ⬇️⬇️⬇️ */}
+                    <Text
+                      style={[
+                        styles.configLabel,
+                        { fontSize: labelFontSize, marginTop: 14 },
+                      ]}
+                    >
+                      SUARA ALARM
+                    </Text>
+                    <View style={{ gap: 8, marginTop: 6 }}>
+                      {ALARM_SOUND_PRESETS.map((s: any) => (
+                        <TouchableOpacity
+                          key={s.id}
+                          onPress={() => setAlarmSoundId(s.id)}
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            backgroundColor: colors.inputBg,
+                            borderWidth: 1,
+                            borderColor:
+                              alarmSoundId === s.id
+                                ? colors.accent
+                                : colors.border,
+                            borderRadius: 8,
+                            paddingHorizontal: 14,
+                            paddingVertical: 10,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: colors.text,
+                              fontSize: 13,
+                              fontWeight: "600",
+                            }}
+                          >
+                            {s.name}
+                          </Text>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 14,
+                            }}
+                          >
+                            <TouchableOpacity
+                              onPress={() => previewAlarmSound(s.id)}
+                              hitSlop={8}
+                            >
+                              <Ionicons
+                                name="play-circle-outline"
+                                size={20}
+                                color={colors.accent}
+                              />
+                            </TouchableOpacity>
+                            {alarmSoundId === s.id && (
+                              <Ionicons
+                                name="checkmark-circle"
+                                size={18}
+                                color={colors.accent}
+                              />
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+
+                      {/* SUARA KUSTOM DARI FILE HP */}
+                      <TouchableOpacity
+                        onPress={pickCustomAlarmSound}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          backgroundColor: colors.inputBg,
+                          borderWidth: 1,
+                          borderColor:
+                            alarmSoundId === "custom"
+                              ? colors.accent
+                              : colors.border,
+                          borderRadius: 8,
+                          paddingHorizontal: 14,
+                          paddingVertical: 10,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: colors.text,
+                            fontSize: 13,
+                            fontWeight: "600",
+                          }}
+                          numberOfLines={1}
+                        >
+                          {customSoundName
+                            ? `📁 ${customSoundName}`
+                            : "📁 Pilih File Sendiri..."}
+                        </Text>
+                        {alarmSoundId === "custom" && (
+                          <Ionicons
+                            name="checkmark-circle"
+                            size={18}
+                            color={colors.accent}
+                          />
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                    {/* ⬆️⬆️⬆️ SAMPAI SINI ⬆️⬆️⬆️ */}
+
+                    {/* 🧪 TOMBOL SEMENTARA UNTUK TESTING — hapus kalau sudah yakin alarm jalan */}
+                    <TouchableOpacity
+                      onPress={onTestTempAlarm}
+                      style={{
+                        marginTop: 10,
+                        paddingVertical: 10,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderStyle: "dashed",
+                        borderColor: "#ffcc00",
+                        alignItems: "center",
+                        flexDirection: "row",
+                        justifyContent: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <Ionicons
+                        name="flask-outline"
+                        size={16}
+                        color="#ffcc00"
+                      />
+                      <Text
+                        style={{
+                          color: "#ffcc00",
+                          fontSize: 11,
+                          fontWeight: "bold",
+                        }}
+                      >
+                        TEST ALARM (SEMENTARA)
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={onSimulateTempRamp}
+                      style={{
+                        marginTop: 8,
+                        paddingVertical: 10,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderStyle: "dashed",
+                        borderColor: isSimulatingTemp ? "#ff4444" : "#00ffcc",
+                        alignItems: "center",
+                        flexDirection: "row",
+                        justifyContent: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <Ionicons
+                        name={
+                          isSimulatingTemp
+                            ? "stop-circle-outline"
+                            : "thermometer-outline"
+                        }
+                        size={16}
+                        color={isSimulatingTemp ? "#ff4444" : "#00ffcc"}
+                      />
+                      <Text
+                        style={{
+                          color: isSimulatingTemp ? "#ff4444" : "#00ffcc",
+                          fontSize: 11,
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {isSimulatingTemp
+                          ? "HENTIKAN SIMULASI"
+                          : "SIMULASI NAIK-TURUN (REAL TEST)"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+
               {/* ✅ MODE TAMPILAN HUD (FLIP MIRROR) */}
               <View
                 style={{
@@ -480,7 +756,9 @@ export default function SettingsModal({
                   <TouchableOpacity
                     onPress={onToggleHudMirror}
                     style={{
-                      backgroundColor: hudMirrorEnabled ? "#00ffcc" : "#333",
+                      backgroundColor: hudMirrorEnabled
+                        ? colors.accent
+                        : "#333",
                       paddingHorizontal: 12,
                       paddingVertical: 6,
                       borderRadius: 20,
@@ -488,7 +766,7 @@ export default function SettingsModal({
                   >
                     <Text
                       style={{
-                        color: hudMirrorEnabled ? "#000" : "#fff",
+                        color: hudMirrorEnabled ? colors.bg : "#fff",
                         fontSize: 10,
                         fontWeight: "bold",
                       }}

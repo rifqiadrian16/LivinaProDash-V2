@@ -5,9 +5,22 @@ import { useAppTheme } from "../../components/AppThemeContext";
 import { getDashboardStyles } from "../../styles/dashboard.styles";
 
 const SensorCard = memo(
-  ({ icon, label, value, color, compact = false }: any) => {
+  ({ icon, label, value, color, compact = false, highlight = false }: any) => {
     const { colors } = useAppTheme();
     const styles = getDashboardStyles(colors);
+
+    // ⬇️ Style tambahan kalau highlight aktif (misal alarm suhu overheat).
+    // Digabung ke style card yang SUDAH ADA lewat array style, bukan
+    // View pembungkus baru — supaya width "31%"/"49%" bawaan card tetap
+    // utuh dan tidak merusak susunan flex-wrap grid.
+    const highlightStyle = highlight
+      ? {
+          borderWidth: 2,
+          borderColor: "#ff0000",
+          backgroundColor: "rgba(255,0,0,0.08)",
+        }
+      : null;
+
     // ==========================================
     // 1. LAYOUT LANDSCAPE (KARTU HORIZONTAL)
     // ==========================================
@@ -25,6 +38,7 @@ const SensorCard = memo(
               flexDirection: "row",
               alignItems: "center",
             },
+            highlightStyle,
           ]}
         >
           {/* KOLOM 1 (KIRI): IKON */}
@@ -58,7 +72,7 @@ const SensorCard = memo(
     // 2. LAYOUT PORTRAIT (KARTU VERTIKAL BAWAAN)
     // ==========================================
     return (
-      <View style={styles.card}>
+      <View style={[styles.card, highlightStyle]}>
         <Ionicons name={icon} size={20} color={color} />
         <Text style={styles.cardValue}>{value}</Text>
         <Text style={styles.cardLabel}>{label}</Text>

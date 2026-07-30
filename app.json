@@ -2,7 +2,7 @@
   "expo": {
     "name": "LivinaProDash",
     "slug": "LivinaProDash",
-    "version": "3.0.0",
+    "version": "3.1.0",
     "orientation": "default",
     "icon": "./assets/images/livina.png",
     "scheme": "livinaprodash",

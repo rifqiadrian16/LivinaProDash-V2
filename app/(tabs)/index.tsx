@@ -213,6 +213,7 @@ export default function DashboardScreen() {
                     avgFuel={state.avgFuel}
                     // 🔥 UBAH DISINI: Matikan compact jika di tablet agar ukuran kartu sensor lebih besar & proporsional
                     compact={!isTabletLandscape}
+                    isOverheating={state.isOverheating}
                   />
                 </ScrollView>
               </View>
@@ -250,6 +251,7 @@ export default function DashboardScreen() {
             data={state.data}
             instFuel={state.instFuel}
             avgFuel={state.avgFuel}
+            isOverheating={state.isOverheating}
           />
         </ScrollView>
       );
@@ -480,6 +482,18 @@ export default function DashboardScreen() {
         onSelectDevice={actions.selectDevice}
         hudMirrorEnabled={state.hudMirrorEnabled}
         onToggleHudMirror={actions.toggleHudMirror}
+        tempAlarmEnabled={state.tempAlarmEnabled}
+        setTempAlarmEnabled={actions.setTempAlarmEnabled}
+        tempAlarmThreshold={state.tempAlarmThreshold}
+        setTempAlarmThreshold={actions.setTempAlarmThreshold}
+        onTestTempAlarm={actions.testTempAlarm}
+        alarmSoundId={state.alarmSoundId}
+        customSoundName={state.customSoundName}
+        setAlarmSoundId={actions.setAlarmSoundId}
+        pickCustomAlarmSound={actions.pickCustomAlarmSound}
+        previewAlarmSound={actions.previewAlarmSound}
+        isSimulatingTemp={state.isSimulatingTemp}
+        onSimulateTempRamp={actions.simulateTempRamp}
       />
       <HudModal
         visible={state.isHudMode}

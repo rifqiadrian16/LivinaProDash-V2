@@ -1,4 +1,1272 @@
+// import AsyncStorage from "@react-native-async-storage/async-storage";
+// import { Audio } from "expo-av";
+// import * as DocumentPicker from "expo-document-picker";
+// import * as FileSystem from "expo-file-system/legacy";
+// import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
+// import * as ExpoLocation from "expo-location";
+// import * as MediaLibrary from "expo-media-library";
+// import * as NavigationBar from "expo-navigation-bar";
+// import * as ScreenOrientation from "expo-screen-orientation";
+// import { useEffect, useRef, useState } from "react";
+// import {
+//   Animated,
+//   PanResponder,
+//   PermissionsAndroid,
+//   Platform,
+//   StatusBar as RNStatusBar,
+//   Vibration,
+// } from "react-native";
+// import { useAlert } from "../components/AlertContext";
+// import { useBLEContext } from "../components/BLEContext";
+// import { useFuelContext } from "../components/FuelContext";
+// import { ALARM_SOUND_PRESETS, CUSTOM_SOUND_ID } from "../constants/alarmSounds";
+// import {
+//   getDB,
+//   insertNewTrip,
+//   insertTripPoint,
+//   updateTripStats,
+// } from "../utils/database";
+
+// const BACKGROUND_LOCATION_TASK = "LIVINA_BACKGROUND_TRACKING";
+// const GLOBAL_AVG_FUEL_KEY = "@prodash_lifetime_avgfuel_global";
+// const MOVING_SPEED_THRESHOLD = 2;
+
+// export default function useDashboard() {
+//   const { showAlert } = useAlert();
+//   const { instFuel, avgFuel } = useFuelContext();
+
+//   const [isHudMode, setIsHudMode] = useState(false);
+//   const [isNightTime, setIsNightTime] = useState(false);
+//   const [transmission, setTransmission] = useState<"manual" | "matic" | null>(
+//     null,
+//   );
+//   const [showTransModal, setShowTransModal] = useState(false);
+
+//   const [otaTapCount, setOtaTapCount] = useState(0);
+//   const [showOTAModal, setShowOTAModal] = useState(false);
+//   const lastTapTime = useRef(0);
+//   const [isBypassed, setIsBypassed] = useState(false);
+//   const [bypassTapCount, setBypassTapCount] = useState(0);
+//   const globalAvgFuelAccumulator = useRef(0.0);
+
+//   const [hudTapCount, setHudTapCount] = useState(0);
+//   const hudTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+//   // ✅ FLIP MIRROR HUD: default TRUE (perilaku lama / reflektor kaca tetap jalan)
+//   // Simpan preferensi user supaya tidak perlu di-set ulang setiap buka app.
+//   const [hudMirrorEnabled, setHudMirrorEnabled] = useState(true);
+
+//   //ALARM OVERHEATING
+//   const [tempAlarmEnabled, setTempAlarmEnabledState] = useState(true);
+//   const [tempAlarmThreshold, setTempAlarmThresholdState] = useState("100");
+//   const [isOverheating, setIsOverheating] = useState(false);
+
+//   const tempAlarmEnabledRef = useRef(true);
+//   const tempAlarmThresholdRef = useRef(100);
+//   const [alarmSoundId, setAlarmSoundIdState] = useState(
+//     ALARM_SOUND_PRESETS[0].id,
+//   );
+//   const [customSoundName, setCustomSoundName] = useState<string | null>(null);
+//   const alarmSoundIdRef = useRef(ALARM_SOUND_PRESETS[0].id);
+//   const customSoundUriRef = useRef<string | null>(null);
+//   const alarmSoundRef = useRef<Audio.Sound | null>(null);
+//   const previewSoundRef = useRef<Audio.Sound | null>(null);
+//   const isOverheatingRef = useRef(false);
+
+//   const tempSimIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+//     null,
+//   );
+//   const [isSimulatingTemp, setIsSimulatingTemp] = useState(false);
+
+//   // 🧪 SEMENTARA: simulasi suhu naik-turun BENERAN lewat updateData(),
+//   // supaya hysteresis (threshold - 5) ke-test sungguhan, bukan cuma alert sekali.
+//   // Alur: mulai 20°C di bawah threshold -> naik pelan sampai 10°C di ATAS
+//   // threshold (alarm harus nyala) -> turun pelan sampai di BAWAH threshold-5
+//   // (alarm harus baru mati DI SINI, bukan pas nyentuh threshold persis).
+//   const simulateTempRamp = () => {
+//     if (tempSimIntervalRef.current) {
+//       clearInterval(tempSimIntervalRef.current);
+//       tempSimIntervalRef.current = null;
+//       setIsSimulatingTemp(false);
+//       return;
+//     }
+
+//     const threshold = tempAlarmThresholdRef.current;
+//     const startTemp = threshold - 20;
+//     const peakTemp = threshold + 10;
+//     let currentSimTemp = startTemp;
+//     let direction: "up" | "down" = "up";
+
+//     setIsSimulatingTemp(true);
+//     showAlert(
+//       "🧪 Simulasi Dimulai",
+//       `Suhu akan naik dari ${startTemp}°C, tembus threshold ${threshold}°C, lalu turun pelan. Alarm baru berhenti setelah suhu ≤ ${threshold - TEMP_ALARM_HYSTERESIS}°C (bukan langsung pas balik ke ${threshold}°C).`,
+//       "success",
+//     );
+
+//     tempSimIntervalRef.current = setInterval(() => {
+//       if (direction === "up") {
+//         currentSimTemp += 1;
+//         if (currentSimTemp >= peakTemp) direction = "down";
+//       } else {
+//         currentSimTemp -= 1;
+//         if (currentSimTemp <= startTemp) {
+//           // Selesai satu siklus penuh, hentikan otomatis
+//           clearInterval(tempSimIntervalRef.current!);
+//           tempSimIntervalRef.current = null;
+//           setIsSimulatingTemp(false);
+//           showAlert(
+//             "🧪 Simulasi Selesai",
+//             "Satu siklus naik-turun selesai.",
+//             "success",
+//           );
+//           return;
+//         }
+//       }
+
+//       // Panggil updateData ASLI dengan data palsu, field lain tetap
+//       // dari data terakhir supaya gauge lain tidak ikut kacau.
+//       updateData({ ...data, t: currentSimTemp });
+//     }, 400); // 1°C tiap 400ms — cukup lambat buat diamati manual
+//   };
+
+//   useEffect(() => {
+//     return () => {
+//       if (tempSimIntervalRef.current) clearInterval(tempSimIntervalRef.current);
+//     };
+//   }, []);
+
+//   const TEMP_ALARM_HYSTERESIS = 5;
+
+//   const [data, setData] = useState({
+//     s: 0,
+//     r: 0,
+//     t: 0,
+//     v: 0,
+//     m: 0,
+//     i: 0,
+//     st: 0,
+//     lt: 0,
+//     tm: 0,
+//     th: 0,
+//     l: 0,
+//   });
+//   const [isRecording, setIsRecording] = useState(false);
+
+//   // const tripDataRef = useRef<any[]>([]);
+//   const lastUpdateTime = useRef(Date.now());
+//   // const lastSaveTime = useRef(0);
+//   const lastStatsSaveTime = useRef(0);
+
+//   // === TAHANAN WAKTU UNTUK LOGGING (MENGURANGI UKURAN FILE JSON 90%) ===
+//   const lastPointSaveTime = useRef(0);
+
+//   const currentTripId = useRef("");
+//   const latestLocation = useRef<ExpoLocation.LocationObjectCoords | null>(null);
+//   const runningStats = useRef({ distance: 0, fuel: 0, startTime: 0 });
+//   const isRecordingRef = useRef(isRecording);
+
+//   const [showSaveTripModal, setShowSaveTripModal] = useState(false);
+//   const [showSettings, setShowSettings] = useState(false);
+//   const [obdType, setObdType] = useState<"bluetooth" | "wifi">("bluetooth");
+//   const [obdMac, setObdMac] = useState("");
+//   const [obdPin, setObdPin] = useState("1234");
+//   const [obdWifiSsid, setObdWifiSsid] = useState("WiFi_OBDII");
+//   const [obdIp, setObdIp] = useState("192.168.0.10");
+//   const [obdPort, setObdPort] = useState("35000");
+//   const [autoLock, setAutoLock] = useState(true);
+//   const [lockSpeed, setLockSpeed] = useState("15");
+//   const [otaSsid, setOtaSsid] = useState("Iqi");
+//   const [otaPass, setOtaPass] = useState("12345678");
+//   const [isConnectingBLE, setIsConnectingBLE] = useState(false);
+//   const connectingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+//   const [obdStatus, setObdStatus] = useState<
+//     "disconnected" | "waiting_mac" | "checking" | "connecting_ecu" | "ready"
+//   >("disconnected");
+//   const [isObdStandby, setIsObdStandby] = useState(false);
+
+//   const [showScanner, setShowScanner] = useState(false);
+//   const [scannedDevices, setScannedDevices] = useState<
+//     { name: string; mac: string }[]
+//   >([]);
+//   const [isSearchingOBD, setIsSearchingOBD] = useState(false);
+//   const [confirmAlert, setConfirmAlert] = useState({
+//     visible: false,
+//     title: "",
+//     message: "",
+//     confirmText: "Ya",
+//     cancelText: "Batal",
+//     isDanger: false,
+//     onConfirm: () => {},
+//   });
+
+//   const [showTerminal, setShowTerminal] = useState(false);
+//   const [terminalLogs, setTerminalLogs] = useState<string[]>([
+//     "LivinaProDash OBD Terminal v1.0",
+//     "Ketik PID lalu tekan Enter/Kirim...",
+//     "--------------------------------",
+//   ]);
+
+//   const fabX = useRef(new Animated.Value(45)).current;
+//   const [isFabOpen, setIsFabOpen] = useState(false);
+
+//   const toggleFab = (open: boolean) => {
+//     setIsFabOpen(open);
+//     Animated.spring(fabX, {
+//       toValue: open ? 0 : 45,
+//       useNativeDriver: true,
+//       friction: 5,
+//     }).start();
+//   };
+
+//   const panResponder = useRef(
+//     PanResponder.create({
+//       onMoveShouldSetPanResponder: (_, gestureState) =>
+//         Math.abs(gestureState.dx) > 10,
+//       onPanResponderRelease: (_, gestureState) => {
+//         if (gestureState.dx < -20) toggleFab(true);
+//         if (gestureState.dx > 20) toggleFab(false);
+//       },
+//     }),
+//   ).current;
+
+//   const [bgPermissionsGranted, setBgPermissionsGranted] = useState(false);
+
+//   useEffect(() => {
+//     const requestAllPermissions = async () => {
+//       if (Platform.OS !== "android") return;
+
+//       // 1. TODONG IZIN NOTIFIKASI (Khusus Android 13+)
+//       if (Platform.Version >= 33) {
+//         try {
+//           await PermissionsAndroid.request(
+//             PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+//           );
+//         } catch (err) {
+//           console.warn("[PERMISSIONS] Gagal minta izin notifikasi:", err);
+//         }
+//       }
+
+//       // 2. TODONG IZIN FOTO / GALERI (Untuk menyimpan Kartu Trip)
+//       try {
+//         const mediaStatus = await MediaLibrary.requestPermissionsAsync();
+//         if (!mediaStatus.granted) {
+//           console.log("[PERMISSIONS] User menolak izin Foto/Galeri");
+//         }
+//       } catch (err) {
+//         console.warn("[PERMISSIONS] Gagal minta izin galeri:", err);
+//       }
+
+//       // 3. TODONG IZIN LOKASI (Foreground dulu, baru Background)
+//       try {
+//         const fgStatus = await ExpoLocation.requestForegroundPermissionsAsync();
+//         if (fgStatus.granted) {
+//           const bgStatus =
+//             await ExpoLocation.requestBackgroundPermissionsAsync();
+//           setBgPermissionsGranted(bgStatus.granted);
+//         }
+//       } catch (err) {
+//         console.warn("[PERMISSIONS] Gagal minta izin lokasi:", err);
+//       }
+//     };
+
+//     // Eksekusi fungsi sapu jagatnya!
+//     requestAllPermissions();
+//   }, []);
+
+//   useEffect(() => {
+//     const loadInitData = async () => {
+//       const hour = new Date().getHours();
+//       setIsNightTime(hour >= 18 || hour < 5);
+//       const savedTrans = await AsyncStorage.getItem("@livina_trans");
+//       if (savedTrans) setTransmission(savedTrans as "manual" | "matic");
+//       else setShowTransModal(true);
+
+//       const savedMac = await AsyncStorage.getItem("@obd_mac");
+//       const savedPin = await AsyncStorage.getItem("@obd_pin");
+//       const savedOtaSsid = await AsyncStorage.getItem("@ota_ssid");
+//       const savedOtaPass = await AsyncStorage.getItem("@ota_pass");
+//       const orphanStats = await AsyncStorage.getItem("@livina_running_stats");
+
+//       // ✅ Muat preferensi Flip Mirror HUD (default tetap true bila belum pernah diset)
+//       const savedHudMirror = await AsyncStorage.getItem("@hud_mirror");
+//       if (savedHudMirror !== null) setHudMirrorEnabled(savedHudMirror === "1");
+
+//       const savedTempAlarmEnabled = await AsyncStorage.getItem(
+//         "@temp_alarm_enabled",
+//       );
+//       if (savedTempAlarmEnabled) {
+//         const val = savedTempAlarmEnabled === "1";
+//         setTempAlarmEnabledState(val);
+//         tempAlarmEnabledRef.current = val;
+//       }
+//       const savedTempAlarmThreshold = await AsyncStorage.getItem(
+//         "@temp_alarm_threshold",
+//       );
+//       if (savedTempAlarmThreshold) {
+//         setTempAlarmThresholdState(savedTempAlarmThreshold);
+//         tempAlarmThresholdRef.current =
+//           parseInt(savedTempAlarmThreshold) || 100;
+//       }
+
+//       const savedSoundId = await AsyncStorage.getItem("@temp_alarm_sound_id");
+//       const savedCustomUri = await AsyncStorage.getItem(
+//         "@temp_alarm_sound_uri",
+//       );
+//       const savedCustomName = await AsyncStorage.getItem(
+//         "@temp_alarm_sound_name",
+//       );
+//       if (savedSoundId) {
+//         setAlarmSoundIdState(savedSoundId);
+//         alarmSoundIdRef.current = savedSoundId;
+//       }
+//       if (savedCustomUri) {
+//         customSoundUriRef.current = savedCustomUri;
+//         setCustomSoundName(savedCustomName);
+//       }
+
+//       if (orphanStats) {
+//         try {
+//           const stats = JSON.parse(orphanStats);
+
+//           if (stats.tripId) {
+//             // 1. Set ulang State sementara (seolah-olah kita masih jalan)
+//             currentTripId.current = stats.tripId;
+//             runningStats.current = {
+//               distance: stats.distance || 0,
+//               fuel: stats.fuel || 0,
+//               startTime: stats.startTime || Date.now(),
+//             };
+
+//             // 2. Panggil fungsi saveTripData agar data dikunci ke SQLite
+//             const autoName = `Auto-Save (Recovery ${new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })})`;
+//             saveTripData(autoName);
+
+//             // 3. Bersihkan sampah agar tidak looping recovery terus menerus
+//             await AsyncStorage.removeItem("@livina_running_stats");
+
+//             showAlert(
+//               "Trip Dipulihkan",
+//               "Aplikasi sempat terhenti. Data perjalanan berhasil diselamatkan dari SQLite!",
+//               "success",
+//             );
+//           }
+//         } catch (e) {
+//           await AsyncStorage.removeItem("@livina_running_stats");
+//         }
+//       }
+
+//       if (savedMac) setObdMac(savedMac);
+//       if (savedPin) setObdPin(savedPin);
+//       if (savedOtaSsid) setOtaSsid(savedOtaSsid);
+//       if (savedOtaPass) setOtaPass(savedOtaPass);
+//     };
+//     loadInitData();
+//   }, []);
+
+//   useEffect(() => {
+//     let sub: ExpoLocation.LocationSubscription | undefined;
+//     const startWatching = async () => {
+//       let { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+//       if (status !== "granted") return;
+//       sub = await ExpoLocation.watchPositionAsync(
+//         {
+//           accuracy: ExpoLocation.Accuracy.High,
+//           timeInterval: 2000,
+//           distanceInterval: 5,
+//         },
+//         (loc) => {
+//           latestLocation.current = loc.coords;
+//         },
+//       );
+//     };
+//     startWatching();
+//     return () => {
+//       if (sub) sub.remove();
+//     };
+//   }, []);
+
+//   useEffect(() => {
+//     isRecordingRef.current = isRecording;
+//   }, [isRecording]);
+
+//   const saveTripData = (tripName: string, fuelPrice: number = 10000) => {
+//     try {
+//       const db = getDB();
+
+//       // Ambil seluruh telemetri dari trip ini untuk menghitung statistik
+//       const points = db.getAllSync(
+//         "SELECT altitude, speed, rpm FROM trip_points WHERE trip_id = ?",
+//         [currentTripId.current],
+//       );
+
+//       let topSpeed = 0;
+//       let maxRpm = 0;
+//       let peakAlt = 0;
+//       let totalClimb = 0;
+//       let previousAlt: number | null = null;
+
+//       points.forEach((p: any) => {
+//         if (p.speed > topSpeed) topSpeed = p.speed;
+//         if (p.rpm > maxRpm) maxRpm = p.rpm;
+//         if (p.altitude > peakAlt) peakAlt = p.altitude;
+//         if (previousAlt !== null && p.altitude > previousAlt)
+//           totalClimb += p.altitude - previousAlt;
+//         previousAlt = p.altitude;
+//       });
+
+//       const fuelUsed = runningStats.current.fuel.toFixed(1);
+
+//       // Kunci datanya!
+//       const finalStats = {
+//         route: tripName.trim() || `Livina Drive`,
+//         distance: runningStats.current.distance.toFixed(1) + " km",
+//         time:
+//           Math.round((Date.now() - runningStats.current.startTime) / 60000) +
+//           "m",
+//         fuel: fuelUsed + " L",
+//         ecoScore: topSpeed > 110 ? 60 : 90,
+//         topSpeed: topSpeed + " km/h",
+//         maxRpm: maxRpm,
+//         cost:
+//           "Rp " +
+//           Math.round(runningStats.current.fuel * fuelPrice).toLocaleString(
+//             "id-ID",
+//           ),
+//         peakAlt: Math.round(peakAlt).toString(),
+//         climb: Math.round(totalClimb).toString(),
+//       };
+
+//       updateTripStats(currentTripId.current, finalStats);
+
+//       // Bersihkan indikator live
+//       AsyncStorage.removeItem("@livina_running_stats");
+//       showAlert("Tersimpan!", "Data perjalanan aman di Database.", "success");
+//     } catch (error) {
+//       console.error("[DB SAVE ERROR]", error);
+//       showAlert("Error", "Gagal merangkum data perjalanan.", "error");
+//     }
+//   };
+
+//   const toggleRecording = async () => {
+//     if (!isRecording) {
+//       const newTripId = Date.now().toString();
+//       currentTripId.current = newTripId;
+//       runningStats.current = { distance: 0, fuel: 0, startTime: Date.now() };
+//       lastUpdateTime.current = Date.now();
+//       lastPointSaveTime.current = Date.now();
+
+//       insertNewTrip(newTripId, "Merekam...");
+
+//       setIsRecording(true);
+//       activateKeepAwakeAsync("recording");
+
+//       // === AKTIFKAN FOREGROUND SERVICE ===
+//       if (bgPermissionsGranted) {
+//         try {
+//           await ExpoLocation.startLocationUpdatesAsync(
+//             BACKGROUND_LOCATION_TASK,
+//             {
+//               accuracy: ExpoLocation.Accuracy.High,
+//               timeInterval: 2000,
+//               distanceInterval: 1,
+//               // Ini yang bikin notifikasi melayang anti-kill muncul!
+//               foregroundService: {
+//                 notificationTitle: "LivinaProDash Aktif",
+//                 notificationBody:
+//                   "Merekam telemetri & koordinat GPS di latar belakang...",
+//                 notificationColor: "#00ffcc",
+//               },
+//             },
+//           );
+//         } catch (err) {
+//           console.log("Gagal start background task", err);
+//         }
+//       }
+
+//       showAlert(
+//         "Recording",
+//         "GPS & Telemetri aktif merekam ke Database.",
+//         "success",
+//       );
+//     } else {
+//       setIsRecording(false);
+//       deactivateKeepAwake("recording");
+
+//       // === MATIKAN FOREGROUND SERVICE ===
+//       try {
+//         await ExpoLocation.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+//       } catch (err) {
+//         // Abaikan kalau memang gak jalan
+//       }
+
+//       setShowSaveTripModal(true);
+//     }
+//   };
+
+//   const confirmSaveTrip = (tripName: string, fuelPrice: number) => {
+//     setShowSaveTripModal(false);
+//     AsyncStorage.removeItem("@livina_running_stats");
+//     saveTripData(tripName, fuelPrice);
+//   };
+
+//   const discardTrip = () => {
+//     setShowSaveTripModal(false);
+
+//     try {
+//       const db = getDB();
+//       db.execSync(`DELETE FROM trips WHERE id = '${currentTripId.current}';`);
+//     } catch (e) {
+//       console.log("Gagal hapus trip dari DB:", e);
+//     }
+
+//     AsyncStorage.removeItem("@livina_running_stats");
+//     showAlert(
+//       "Dibatalkan",
+//       "Trip tidak disimpan dan dihapus dari memori.",
+//       "error",
+//     );
+//   };
+
+//   const handleRawText = (raw: string) => {
+//     if (raw.startsWith("RAW_RES:")) {
+//       const balasan = raw.substring(8);
+//       setTerminalLogs((prev) => [...prev, `ECU > ${balasan || "NO DATA"}`]);
+//       return;
+//     }
+//     if (raw === "STATUS:WAITING_MAC") setObdStatus("waiting_mac");
+//     else if (raw === "SCAN_STATUS:SCANNING") setIsSearchingOBD(true);
+//     else if (raw === "SCAN_STATUS:DONE") setIsSearchingOBD(false);
+//     else if (raw.startsWith("SCAN_FOUND:")) {
+//       const parts = raw.replace("SCAN_FOUND:", "").split("|");
+//       if (parts.length === 2) {
+//         setScannedDevices((prev) =>
+//           prev.find((d) => d.mac === parts[1])
+//             ? prev
+//             : [...prev, { name: parts[0], mac: parts[1] }],
+//         );
+//       }
+//     } else if (raw.startsWith("CONFIG:")) {
+//       const pairs = raw.replace("CONFIG:", "").split(",");
+//       const config: Record<string, string> = {};
+//       pairs.forEach((pair) => {
+//         const [key, value] = pair.split("=");
+//         if (key && value) config[key] = value;
+//       });
+//       if (config.autolock !== undefined) setAutoLock(config.autolock === "1");
+//       if (config.lockspeed !== undefined) setLockSpeed(config.lockspeed);
+
+//       if (config.hasmac === "0") setObdStatus("waiting_mac");
+//       else if (config.hasmac === "1" && obdStatus !== "ready")
+//         setObdStatus("connecting_ecu");
+//     }
+//   };
+
+//   const updateData = (newData: any) => {
+//     setData(newData);
+//     if (newData.v > 0 || newData.r > 0) setObdStatus("ready");
+
+//     if (tempAlarmEnabledRef.current) {
+//       const threshold = tempAlarmThresholdRef.current;
+//       if (!isOverheatingRef.current && newData.t >= threshold) {
+//         isOverheatingRef.current = true;
+//         setIsOverheating(true);
+//         Vibration.vibrate([0, 400, 200, 400], true);
+//         playAlarmSound();
+//         showAlert(
+//           "⚠️ SUHU MESIN TINGGI!",
+//           `Suhu coolant mencapai ${newData.t}°C (batas: ${threshold}°C). Alarm akan berhenti otomatis setelah suhu turun ke ${threshold - TEMP_ALARM_HYSTERESIS}°C atau lebih rendah. Segera periksa kondisi mesin.`,
+//           "error",
+//         );
+//       } else if (
+//         isOverheatingRef.current &&
+//         newData.t <= threshold - TEMP_ALARM_HYSTERESIS
+//       ) {
+//         isOverheatingRef.current = false;
+//         setIsOverheating(false);
+//         Vibration.cancel();
+//         stopAlarmSound();
+//       }
+//     }
+
+//     const now = Date.now();
+//     const dt = (now - lastUpdateTime.current) / 3600000;
+//     lastUpdateTime.current = now;
+
+//     // === RUMUS BENSIN SEPERTI ASLINYA ===
+//     let targetAFR = 14.7;
+//     if (newData.th > 60) targetAFR = 11.5;
+//     else if (newData.th > 40) targetAFR = 12.5;
+//     else if (newData.th > 20) targetAFR = 13.5;
+
+//     let fuelFlow = (newData.m / targetAFR / 730.0) * 3600.0;
+//     const fuelCalibration = 1.28;
+//     fuelFlow =
+//       fuelFlow * (1 + (newData.st + newData.lt) / 100) * fuelCalibration;
+
+//     const isDFCO = newData.th < 0 && newData.s > 20 && newData.r > 1200;
+//     if (isDFCO) fuelFlow = 0;
+
+//     if (isRecordingRef.current) {
+//       if (dt > 0 && dt < 0.003) {
+//         runningStats.current.distance += newData.s * dt;
+//         runningStats.current.fuel += fuelFlow * dt;
+
+//         if (now - lastStatsSaveTime.current > 10000) {
+//           lastStatsSaveTime.current = now;
+//           AsyncStorage.setItem(
+//             "@livina_running_stats",
+//             JSON.stringify({
+//               ...runningStats.current,
+//               tripId: currentTripId.current,
+//             }),
+//           ).catch(() => {});
+//         }
+//       }
+
+//       // DATA LOGGER (THROTTLED): 2 Detik Sekali
+//       if (now - lastPointSaveTime.current > 2000) {
+//         lastPointSaveTime.current = now;
+
+//         let recInst = 0.0;
+//         if (isDFCO) recInst = 99.9;
+//         else if (newData.s > 2 && fuelFlow > 0)
+//           recInst = Math.min(newData.s / fuelFlow, 99.9);
+
+//         // Langsung Tembak Baris Baru ke SQLite! (0% RAM)
+//         try {
+//           insertTripPoint(currentTripId.current, {
+//             latitude: latestLocation.current?.latitude || 0,
+//             longitude: latestLocation.current?.longitude || 0,
+//             altitude: latestLocation.current?.altitude || 0,
+//             speed: newData.s,
+//             rpm: newData.r,
+//             temp: newData.t,
+//             iat: newData.i,
+//             maf: newData.m,
+//             stft: newData.st,
+//             ltft: newData.lt,
+//             timing: newData.tm,
+//             volt: newData.v,
+//             throttle: newData.th,
+//             instFuel: recInst.toFixed(1),
+//             time: new Date().toLocaleTimeString("id-ID", {
+//               hour: "2-digit",
+//               minute: "2-digit",
+//             }),
+//             note: isDFCO
+//               ? "Engine Brake (0%)"
+//               : newData.s > 80
+//                 ? "High Speed"
+//                 : newData.r > 3500
+//                   ? "Aggressive"
+//                   : "Cruising",
+//           });
+//         } catch (dbError) {
+//           console.warn("Gagal simpan titik, mungkin storage penuh:", dbError);
+//           // Aplikasi tidak akan crash, hanya melewati 1 frame data ini
+//         }
+//       }
+//     }
+//   };
+
+//   const {
+//     isConnected,
+//     requestPermissions,
+//     scanForDevices,
+//     sendMessage,
+//     disconnectDevice,
+//     subscribeData,
+//     subscribeRaw,
+//   } = useBLEContext();
+
+//   // Ref trick (pola sama kayak di useBLE.ts) — listener yang didaftarkan
+//   // ke Context selalu pakai versi updateData/handleRawText TERBARU,
+//   // tanpa subscribe-unsubscribe ulang tiap render.
+//   const updateDataRef = useRef(updateData);
+//   updateDataRef.current = updateData;
+//   const handleRawTextRef = useRef(handleRawText);
+//   handleRawTextRef.current = handleRawText;
+
+//   useEffect(() => {
+//     const unsubData = subscribeData((d: any) => updateDataRef.current(d));
+//     const unsubRaw = subscribeRaw((t: string) => handleRawTextRef.current(t));
+//     return () => {
+//       unsubData();
+//       unsubRaw();
+//     };
+//   }, []);
+
+//   const isConnectedRef = useRef(isConnected);
+
+//   useEffect(() => {
+//     isConnectedRef.current = isConnected;
+//   }, [isConnected]);
+
+//   useEffect(() => {
+//     if (isConnected) {
+//       lastUpdateTime.current = Date.now();
+//       if (connectingTimerRef.current) {
+//         clearTimeout(connectingTimerRef.current);
+//         connectingTimerRef.current = null;
+//       }
+//       setIsConnectingBLE(false);
+//       const timer = setTimeout(() => {
+//         setIsObdStandby(false);
+//         sendMessage("CONNECT_OBD");
+//         sendMessage("GET_CONFIG");
+//       }, 1000);
+//       return () => clearTimeout(timer);
+//     }
+//   }, [isConnected]);
+
+//   useEffect(() => {
+//     const isDashboardUtama = obdStatus === "ready" || isBypassed;
+//     if (isDashboardUtama && isNightTime) {
+//       const AlertTimer = setTimeout(() => {
+//         showAlert(
+//           "Mode Malam Terdeteksi",
+//           "Ketuk ikon 'mata' untuk masuk ke mode HUD",
+//           "success",
+//         );
+//       }, 1500);
+//       return () => clearTimeout(AlertTimer);
+//     }
+//   }, [obdStatus, isBypassed, isNightTime]);
+
+//   useEffect(() => {
+//     if (!isConnected) {
+//       setObdStatus("disconnected");
+//       setIsHudMode(false);
+//       setShowSettings(false);
+//       setShowTransModal(false);
+//       setShowOTAModal(false);
+//       setShowTerminal(false);
+//       setShowScanner(false);
+//       setShowSaveTripModal(false);
+//       deactivateKeepAwake("hud");
+
+//       if (isRecordingRef.current) {
+//         console.log("⚠️ BLE Putus! Memicu Auto-Save Trip...");
+//         setIsRecording(false);
+//         isRecordingRef.current = false;
+//         deactivateKeepAwake("recording");
+
+//         setTimeout(() => {
+//           const autoName = `Auto-Save (${new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })})`;
+//           saveTripData(autoName);
+//           showAlert(
+//             "Koneksi Terputus",
+//             "Sistem mematikan perekaman dan mengamankan data otomatis.",
+//             "success",
+//           );
+//         }, 300);
+//       }
+//     } else {
+//       setObdStatus("checking");
+//     }
+//   }, [isConnected]);
+
+//   useEffect(() => {
+//     if (isBypassed) return;
+//     if (!isConnected && isRecording) {
+//       console.warn(
+//         "Bluetooth putus di tengah jalan! Menghentikan perekaman...",
+//       );
+//       // Panggil fungsi toggleRecord untuk mematikan mode record
+//       toggleRecording();
+
+//       // Beri tahu user
+//       showAlert(
+//         "Koneksi Terputus",
+//         "Perekaman Trip dihentikan otomatis karena modul OBD/ESP32 terputus.",
+//         "error",
+//       );
+//     }
+//   }, [isConnected, isRecording, isBypassed]);
+
+//   useEffect(() => {
+//     return () => {
+//       stopAlarmSound();
+//     };
+//   }, []);
+
+//   const handleConnectToModule = async () => {
+//     const hasPermission = await requestPermissions();
+//     if (hasPermission) {
+//       setIsConnectingBLE(true);
+//       connectingTimerRef.current = setTimeout(() => {
+//         if (!isConnectedRef.current) {
+//           setIsConnectingBLE(false);
+//           showAlert("Koneksi Gagal", "Modul tidak ditemukan.", "error");
+//         }
+//       }, 25000);
+//       scanForDevices();
+//     } else {
+//       showAlert(
+//         "Izin Ditolak",
+//         "Aplikasi butuh akses Bluetooth & Lokasi.",
+//         "error",
+//       );
+//     }
+//   };
+
+//   const handleHudTap = () => {
+//     if (hudTapTimer.current) clearTimeout(hudTapTimer.current);
+//     setHudTapCount((prevCount) => {
+//       if (prevCount >= 1) {
+//         exitHudMode();
+//         return 0;
+//       } else {
+//         hudTapTimer.current = setTimeout(() => {
+//           setHudTapCount(0);
+//         }, 800);
+//         return 1;
+//       }
+//     });
+//   };
+
+//   const applyOBDConfig = async () => {
+//     if (obdType === "bluetooth") {
+//       if (!obdMac || !obdPin)
+//         return showAlert("Error", "MAC/PIN kosong!", "error");
+//       await AsyncStorage.setItem("@obd_mac", obdMac);
+//       await AsyncStorage.setItem("@obd_pin", obdPin);
+
+//       // Murni dijejerin saja, Queue yang akan mengaturnya!
+//       sendMessage(`SET_OBD_MAC:${obdMac}`);
+//       sendMessage(`SET_OBD_PIN:${obdPin}`);
+//       sendMessage("SET_MODE_1");
+//     } else {
+//       if (!obdWifiSsid) return showAlert("Error", "SSID kosong!", "error");
+
+//       sendMessage(`SET_OBD_WIFI_SSID:${obdWifiSsid}`);
+//       sendMessage(`SET_OBD_WIFI_IP:${obdIp}`);
+//       sendMessage(`SET_OBD_WIFI_PORT:${obdPort}`);
+//       sendMessage("SET_MODE_2");
+//     }
+//     setShowSettings(false);
+//     showAlert("Konfigurasi Tersimpan", "ESP32 akan restart.", "success");
+//   };
+
+//   const enterHudMode = async () => {
+//     // 1. Matikan fungsi rotasi & status bar jika dibuka di Web
+//     if (Platform.OS !== "web") {
+//       try {
+//         await ScreenOrientation.lockAsync(
+//           ScreenOrientation.OrientationLock.LANDSCAPE,
+//         );
+//         await NavigationBar.setVisibilityAsync("hidden");
+//         RNStatusBar.setHidden(true, "none");
+//         await activateKeepAwakeAsync("hud");
+//       } catch (error) {
+//         console.log("Gagal lock orientation di HUD:", error);
+//       }
+//     }
+
+//     // 2. Ini yang paling penting: State Modal HUD akan SELALU jalan
+//     setIsHudMode(true);
+//   };
+
+//   const exitHudMode = async () => {
+//     // 1. Matikan fungsi rotasi & status bar jika dibuka di Web
+//     if (Platform.OS !== "web") {
+//       try {
+//         // ✅ FIX: unlock total, JANGAN paksa PORTRAIT_UP.
+//         // Kalau sebelum masuk HUD orientasi udah landscape (head unit),
+//         // ini biar balik bebas ngikutin sensor, bukan nyangkut portrait.
+//         await ScreenOrientation.unlockAsync();
+//         await NavigationBar.setVisibilityAsync("visible");
+//         RNStatusBar.setHidden(false, "slide");
+//         await deactivateKeepAwake("hud");
+//       } catch (error) {
+//         console.log("Gagal unlock orientation di HUD:", error);
+//       }
+//     }
+
+//     // 2. State untuk menutup Modal HUD SELALU jalan
+//     setIsHudMode(false);
+//     if (hudTapTimer.current) {
+//       clearTimeout(hudTapTimer.current);
+//       setHudTapCount(0);
+//     }
+//   };
+
+//   const handleSetupSecretTap = () => {
+//     const newCount = bypassTapCount + 1;
+//     setBypassTapCount(newCount);
+//     if (newCount >= 3) {
+//       setIsBypassed(true);
+//       showAlert("Bypass Active", "Mode Demo diaktifkan.", "success");
+//     }
+//   };
+
+//   const handleSecretOtaTrigger = () => {
+//     const now = Date.now();
+//     if (now - lastTapTime.current > 1000) setOtaTapCount(1);
+//     else {
+//       const newCount = otaTapCount + 1;
+//       setOtaTapCount(newCount);
+//       if (newCount >= 5) {
+//         setShowOTAModal(true);
+//         setOtaTapCount(0);
+//       }
+//     }
+//     lastTapTime.current = now;
+//   };
+
+//   const saveTransmission = async (type: "manual" | "matic") => {
+//     await AsyncStorage.setItem("@livina_trans", type);
+//     setTransmission(type);
+//     setShowTransModal(false);
+//   };
+
+//   const disconnectOBD = () => {
+//     if (isObdStandby) {
+//       sendMessage("CONNECT_OBD");
+//       setIsObdStandby(false);
+//       setObdStatus("connecting_ecu");
+//       showAlert(
+//         "Menghubungkan",
+//         "ESP32 mencoba mengunci ulang OBD2...",
+//         "success",
+//       );
+//     } else {
+//       setConfirmAlert({
+//         visible: true,
+//         title: "Masuk Mode Standby",
+//         message: "Memutus ESP32 dari OBD2. Lanjutkan?",
+//         confirmText: "Ya, Putuskan",
+//         cancelText: "Batal",
+//         isDanger: true,
+//         onConfirm: () => {
+//           sendMessage("DISCONNECT_OBD");
+//           setIsObdStandby(true);
+//           setConfirmAlert((prev) => ({ ...prev, visible: false }));
+//           showAlert("Standby Aktif", "Koneksi OBD2 dilepas", "success");
+//         },
+//       });
+//     }
+//   };
+
+//   const startScannerUI = (type: "bluetooth" | "wifi") => {
+//     setShowScanner(true);
+//     setScannedDevices([]);
+//     setIsSearchingOBD(true);
+//     if (type === "bluetooth") sendMessage("START_BT_SCAN");
+//     else sendMessage("START_WIFI_SCAN");
+//   };
+
+//   const selectDevice = (name: string, mac: string) => {
+//     if (mac === "WIFI") setObdWifiSsid(name);
+//     else setObdMac(mac);
+//     setShowScanner(false);
+//   };
+
+//   const enterOTAMode = async () => {
+//     if (!otaSsid || !otaPass)
+//       return showAlert(
+//         "Error",
+//         "SSID dan Password Hotspot tidak boleh kosong!",
+//         "error",
+//       );
+//     await AsyncStorage.setItem("@ota_ssid", otaSsid);
+//     await AsyncStorage.setItem("@ota_pass", otaPass);
+//     setShowOTAModal(false);
+
+//     setConfirmAlert({
+//       visible: true,
+//       title: "Masuk Mode Update (OTA)?",
+//       message: `Modul akan restart dan mencari Hotspot:\n"${otaSsid}"\n\nPastikan Hotspot HP Mas sudah aktif.`,
+//       confirmText: "Ya",
+//       cancelText: "Batal",
+//       isDanger: true,
+//       onConfirm: () => {
+//         // Bebas tumpuk perintah, aman 100%!
+//         sendMessage(`WIFI_SSID:${otaSsid}`);
+//         sendMessage(`WIFI_PASS:${otaPass}`);
+//         sendMessage("SET_MODE_0");
+
+//         setConfirmAlert((prev) => ({ ...prev, visible: false }));
+//         showAlert(
+//           "Mode OTA Aktif",
+//           `Nyalakan Hotspot "${otaSsid}" dan buka Aplikasi OTA.`,
+//           "success",
+//         );
+//       },
+//     });
+//   };
+
+//   // ✅ TOGGLE FLIP MIRROR HUD (dipakai oleh tombol cepat di HUD & Settings)
+//   const toggleHudMirror = async () => {
+//     const next = !hudMirrorEnabled;
+//     setHudMirrorEnabled(next);
+//     await AsyncStorage.setItem("@hud_mirror", next ? "1" : "0");
+//   };
+
+//   const setTempAlarmEnabled = async (val: boolean) => {
+//     setTempAlarmEnabledState(val);
+//     tempAlarmEnabledRef.current = val;
+//     await AsyncStorage.setItem("@temp_alarm_enabled", val ? "1" : "0");
+//     if (!val) {
+//       isOverheatingRef.current = false;
+//       setIsOverheating(false);
+//       Vibration.cancel();
+//       stopAlarmSound();
+//     }
+//   };
+
+//   const setTempAlarmThreshold = async (val: string) => {
+//     setTempAlarmThresholdState(val);
+//     const parsed = parseInt(val);
+//     if (!isNaN(parsed)) tempAlarmThresholdRef.current = parsed;
+//     await AsyncStorage.setItem("@temp_alarm_threshold", val);
+//   };
+
+//   const testTempAlarm = async () => {
+//     const threshold = tempAlarmThresholdRef.current;
+//     Vibration.vibrate([0, 400, 200, 400]);
+//     try {
+//       await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+//       const { sound } = await Audio.Sound.createAsync(resolveAlarmSource());
+//       await sound.playAsync();
+//       setTimeout(() => sound.unloadAsync(), 3000);
+//     } catch (e) {
+//       console.log("[TEST ALARM] Gagal memutar suara:", e);
+//     }
+//     showAlert(
+//       "⚠️ SUHU MESIN TINGGI! (TEST)",
+//       `Ini simulasi alarm. Threshold saat ini: ${threshold}°C.`,
+//       "error",
+//     );
+//   };
+
+//   const playAlarmSound = async () => {
+//     try {
+//       if (alarmSoundRef.current) {
+//         await alarmSoundRef.current.replayAsync();
+//         return;
+//       }
+//       await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+//       const { sound } = await Audio.Sound.createAsync(resolveAlarmSource(), {
+//         isLooping: true,
+//         volume: 1.0,
+//       });
+//       alarmSoundRef.current = sound;
+//       await sound.playAsync();
+//     } catch (e) {
+//       console.log("[TEMP ALARM] Gagal memutar suara alarm:", e);
+//     }
+//   };
+
+//   const stopAlarmSound = async () => {
+//     try {
+//       if (alarmSoundRef.current) {
+//         await alarmSoundRef.current.stopAsync();
+//         await alarmSoundRef.current.unloadAsync();
+//         alarmSoundRef.current = null;
+//       }
+//     } catch (e) {
+//       console.log("[TEMP ALARM] Gagal stop suara alarm:", e);
+//     }
+//   };
+
+//   const sendToTerminal = (cmd: string) => {
+//     if (!cmd.trim()) return;
+//     setTerminalLogs((prev) => [...prev, `$ ${cmd}`]);
+//     sendMessage(`RAW:${cmd}`);
+//   };
+
+//   const closeTerminal = () => {
+//     setShowTerminal(false);
+//     setTerminalLogs([
+//       "LivinaProDash OBD Terminal v1.0",
+//       "Ketik PID lalu tekan Enter/Kirim...",
+//       "--------------------------------",
+//     ]);
+//   };
+
+//   const resolveAlarmSource = () => {
+//     if (
+//       alarmSoundIdRef.current === CUSTOM_SOUND_ID &&
+//       customSoundUriRef.current
+//     ) {
+//       return { uri: customSoundUriRef.current };
+//     }
+//     const preset = ALARM_SOUND_PRESETS.find(
+//       (p) => p.id === alarmSoundIdRef.current,
+//     );
+//     return preset ? preset.source : ALARM_SOUND_PRESETS[0].source;
+//   };
+
+//   const setAlarmSoundId = async (id: string) => {
+//     setAlarmSoundIdState(id);
+//     alarmSoundIdRef.current = id;
+//     await AsyncStorage.setItem("@temp_alarm_sound_id", id);
+//   };
+
+//   const pickCustomAlarmSound = async () => {
+//     try {
+//       const result = await DocumentPicker.getDocumentAsync({
+//         type: "audio/*",
+//         copyToCacheDirectory: true,
+//       });
+//       if (result.canceled || !result.assets?.[0]) return;
+
+//       const picked = result.assets[0];
+//       const destDir = FileSystem.documentDirectory + "alarm_sounds/";
+//       await FileSystem.makeDirectoryAsync(destDir, {
+//         intermediates: true,
+//       }).catch(() => {});
+//       const ext = picked.name.split(".").pop() || "mp3";
+//       const destUri = destDir + "custom_alarm." + ext;
+
+//       await FileSystem.copyAsync({ from: picked.uri, to: destUri });
+
+//       customSoundUriRef.current = destUri;
+//       setCustomSoundName(picked.name);
+//       setAlarmSoundIdState(CUSTOM_SOUND_ID);
+//       alarmSoundIdRef.current = CUSTOM_SOUND_ID;
+
+//       await AsyncStorage.setItem("@temp_alarm_sound_id", CUSTOM_SOUND_ID);
+//       await AsyncStorage.setItem("@temp_alarm_sound_uri", destUri);
+//       await AsyncStorage.setItem("@temp_alarm_sound_name", picked.name);
+
+//       showAlert(
+//         "Tersimpan",
+//         `Suara alarm kustom "${picked.name}" berhasil dipasang.`,
+//         "success",
+//       );
+//     } catch (e) {
+//       console.log("[TEMP ALARM] Gagal memilih file suara:", e);
+//       showAlert("Gagal", "Tidak bisa memuat file suara yang dipilih.", "error");
+//     }
+//   };
+
+//   const previewAlarmSound = async (id: string) => {
+//     try {
+//       if (previewSoundRef.current) {
+//         await previewSoundRef.current.stopAsync();
+//         await previewSoundRef.current.unloadAsync();
+//         previewSoundRef.current = null;
+//       }
+//       const preset = ALARM_SOUND_PRESETS.find((p) => p.id === id);
+//       if (!preset) return;
+//       await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+//       const { sound } = await Audio.Sound.createAsync(preset.source);
+//       previewSoundRef.current = sound;
+//       await sound.playAsync();
+//       setTimeout(async () => {
+//         if (previewSoundRef.current === sound) {
+//           await sound.unloadAsync();
+//           previewSoundRef.current = null;
+//         }
+//       }, 2500);
+//     } catch (e) {
+//       console.log("[TEMP ALARM] Gagal preview suara:", e);
+//     }
+//   };
+
+//   return {
+//     state: {
+//       isHudMode,
+//       isNightTime,
+//       transmission,
+//       showTransModal,
+//       showOTAModal,
+//       otaSsid,
+//       otaPass,
+//       isBypassed,
+//       bypassTapCount,
+//       data,
+//       isRecording,
+//       avgFuel,
+//       instFuel,
+//       showSettings,
+//       obdType,
+//       obdMac,
+//       obdPin,
+//       obdWifiSsid,
+//       obdIp,
+//       obdPort,
+//       obdStatus,
+//       isObdStandby,
+//       autoLock,
+//       lockSpeed,
+//       isConnectingBLE,
+//       showScanner,
+//       scannedDevices,
+//       isSearchingOBD,
+//       confirmAlert,
+//       isConnected,
+//       fabX,
+//       isFabOpen,
+//       panResponder,
+//       hudTapCount,
+//       showTerminal,
+//       terminalLogs,
+//       showSaveTripModal,
+//       hudMirrorEnabled,
+//       tempAlarmEnabled,
+//       tempAlarmThreshold,
+//       isOverheating,
+//       alarmSoundId,
+//       customSoundName,
+//       isSimulatingTemp,
+//     },
+//     actions: {
+//       setOtaSsid,
+//       setOtaPass,
+//       setShowOTAModal,
+//       setShowSettings,
+//       setObdType,
+//       setObdMac,
+//       setObdPin,
+//       setObdWifiSsid,
+//       setObdIp,
+//       setObdPort,
+//       setAutoLock,
+//       setLockSpeed,
+//       setShowScanner,
+//       setConfirmAlert,
+//       setShowTerminal,
+//       sendToTerminal,
+//       handleConnectToModule,
+//       applyOBDConfig,
+//       enterHudMode,
+//       exitHudMode,
+//       sendMessage,
+//       toggleFab,
+//       disconnectDevice,
+//       setHudTapCount,
+//       handleSetupSecretTap,
+//       handleSecretOtaTrigger,
+//       saveTransmission,
+//       disconnectOBD,
+//       startScannerUI,
+//       selectDevice,
+//       enterOTAMode,
+//       toggleRecording,
+//       handleHudTap,
+//       closeTerminal,
+//       confirmSaveTrip,
+//       discardTrip,
+//       toggleHudMirror,
+//       setTempAlarmEnabled,
+//       setTempAlarmThreshold,
+//       testTempAlarm,
+//       setAlarmSoundId,
+//       pickCustomAlarmSound,
+//       previewAlarmSound,
+//       simulateTempRamp,
+//     },
+//   };
+// }
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Audio } from "expo-av";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import * as ExpoLocation from "expo-location";
 import * as MediaLibrary from "expo-media-library";
@@ -11,10 +1279,12 @@ import {
   PermissionsAndroid,
   Platform,
   StatusBar as RNStatusBar,
+  Vibration,
 } from "react-native";
 import { useAlert } from "../components/AlertContext";
 import { useBLEContext } from "../components/BLEContext";
 import { useFuelContext } from "../components/FuelContext";
+import { ALARM_SOUND_PRESETS, CUSTOM_SOUND_ID } from "../constants/alarmSounds";
 import {
   getDB,
   insertNewTrip,
@@ -50,6 +1320,29 @@ export default function useDashboard() {
   // ✅ FLIP MIRROR HUD: default TRUE (perilaku lama / reflektor kaca tetap jalan)
   // Simpan preferensi user supaya tidak perlu di-set ulang setiap buka app.
   const [hudMirrorEnabled, setHudMirrorEnabled] = useState(true);
+
+  //ALARM OVERHEATING
+  const [tempAlarmEnabled, setTempAlarmEnabledState] = useState(true);
+  const [tempAlarmThreshold, setTempAlarmThresholdState] = useState("100");
+  const [isOverheating, setIsOverheating] = useState(false);
+
+  const tempAlarmEnabledRef = useRef(true);
+  const tempAlarmThresholdRef = useRef(100);
+  const [alarmSoundId, setAlarmSoundIdState] = useState(
+    ALARM_SOUND_PRESETS[0].id,
+  );
+  const [customSoundName, setCustomSoundName] = useState<string | null>(null);
+  const alarmSoundIdRef = useRef(ALARM_SOUND_PRESETS[0].id);
+  const customSoundUriRef = useRef<string | null>(null);
+  const alarmSoundRef = useRef<Audio.Sound | null>(null);
+  const previewSoundRef = useRef<Audio.Sound | null>(null);
+  const isOverheatingRef = useRef(false);
+  const tempSimIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
+  const [isSimulatingTemp, setIsSimulatingTemp] = useState(false);
+
+  const TEMP_ALARM_HYSTERESIS = 5;
 
   const [data, setData] = useState({
     s: 0,
@@ -205,6 +1498,39 @@ export default function useDashboard() {
       const savedHudMirror = await AsyncStorage.getItem("@hud_mirror");
       if (savedHudMirror !== null) setHudMirrorEnabled(savedHudMirror === "1");
 
+      const savedTempAlarmEnabled = await AsyncStorage.getItem(
+        "@temp_alarm_enabled",
+      );
+      if (savedTempAlarmEnabled) {
+        const val = savedTempAlarmEnabled === "1";
+        setTempAlarmEnabledState(val);
+        tempAlarmEnabledRef.current = val;
+      }
+      const savedTempAlarmThreshold = await AsyncStorage.getItem(
+        "@temp_alarm_threshold",
+      );
+      if (savedTempAlarmThreshold) {
+        setTempAlarmThresholdState(savedTempAlarmThreshold);
+        tempAlarmThresholdRef.current =
+          parseInt(savedTempAlarmThreshold) || 100;
+      }
+
+      const savedSoundId = await AsyncStorage.getItem("@temp_alarm_sound_id");
+      const savedCustomUri = await AsyncStorage.getItem(
+        "@temp_alarm_sound_uri",
+      );
+      const savedCustomName = await AsyncStorage.getItem(
+        "@temp_alarm_sound_name",
+      );
+      if (savedSoundId) {
+        setAlarmSoundIdState(savedSoundId);
+        alarmSoundIdRef.current = savedSoundId;
+      }
+      if (savedCustomUri) {
+        customSoundUriRef.current = savedCustomUri;
+        setCustomSoundName(savedCustomName);
+      }
+
       if (orphanStats) {
         try {
           const stats = JSON.parse(orphanStats);
@@ -341,28 +1667,11 @@ export default function useDashboard() {
       setIsRecording(true);
       activateKeepAwakeAsync("recording");
 
-      // === AKTIFKAN FOREGROUND SERVICE ===
-      if (bgPermissionsGranted) {
-        try {
-          await ExpoLocation.startLocationUpdatesAsync(
-            BACKGROUND_LOCATION_TASK,
-            {
-              accuracy: ExpoLocation.Accuracy.High,
-              timeInterval: 2000,
-              distanceInterval: 1,
-              // Ini yang bikin notifikasi melayang anti-kill muncul!
-              foregroundService: {
-                notificationTitle: "LivinaProDash Aktif",
-                notificationBody:
-                  "Merekam telemetri & koordinat GPS di latar belakang...",
-                notificationColor: "#00ffcc",
-              },
-            },
-          );
-        } catch (err) {
-          console.log("Gagal start background task", err);
-        }
-      }
+      // Foreground service SEKARANG diatur terpusat oleh effect
+      // updateBackgroundServiceState (dipicu perubahan isRecording di
+      // bawah), bukan manual di sini lagi — supaya tidak bentrok dengan
+      // foreground service yang mungkin sudah aktif duluan karena BLE
+      // konek (dipakai buat jaga alarm suhu tetap jalan di background).
 
       showAlert(
         "Recording",
@@ -373,12 +1682,10 @@ export default function useDashboard() {
       setIsRecording(false);
       deactivateKeepAwake("recording");
 
-      // === MATIKAN FOREGROUND SERVICE ===
-      try {
-        await ExpoLocation.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
-      } catch (err) {
-        // Abaikan kalau memang gak jalan
-      }
+      // Foreground service TIDAK langsung dimatikan di sini — kalau modul
+      // BLE masih terhubung, dia harus tetap hidup demi alarm suhu.
+      // Effect updateBackgroundServiceState yang akan memutuskan mati/tidak
+      // berdasarkan kombinasi isConnected & isRecording terbaru.
 
       setShowSaveTripModal(true);
     }
@@ -445,6 +1752,29 @@ export default function useDashboard() {
   const updateData = (newData: any) => {
     setData(newData);
     if (newData.v > 0 || newData.r > 0) setObdStatus("ready");
+
+    if (tempAlarmEnabledRef.current) {
+      const threshold = tempAlarmThresholdRef.current;
+      if (!isOverheatingRef.current && newData.t >= threshold) {
+        isOverheatingRef.current = true;
+        setIsOverheating(true);
+        Vibration.vibrate([0, 400, 200, 400], true); // repeat=true, terus getar selagi alarm aktif
+        playAlarmSound();
+        showAlert(
+          "⚠️ SUHU MESIN TINGGI!",
+          `Suhu coolant mencapai ${newData.t}°C (batas: ${threshold}°C). Segera periksa kondisi mesin.`,
+          "error",
+        );
+      } else if (
+        isOverheatingRef.current &&
+        newData.t <= threshold - TEMP_ALARM_HYSTERESIS
+      ) {
+        isOverheatingRef.current = false;
+        setIsOverheating(false);
+        Vibration.cancel();
+        stopAlarmSound();
+      }
+    }
 
     const now = Date.now();
     const dt = (now - lastUpdateTime.current) / 3600000;
@@ -560,6 +1890,60 @@ export default function useDashboard() {
     isConnectedRef.current = isConnected;
   }, [isConnected]);
 
+  // =========================================================
+  // FOREGROUND SERVICE TERPUSAT — satu-satunya tempat yang boleh
+  // start/stop background location task. Aktif kalau SALAH SATU dari
+  // dua alasan ini benar:
+  //   1. isRecording  -> perlu GPS presisi tinggi buat catat rute trip
+  //   2. isConnected  -> BLE tersambung, alarm suhu harus tetap bisa
+  //      jalan di background walau user tidak sedang merekam trip
+  // Dengan begini, mematikan recording TIDAK otomatis mematikan service
+  // kalau modul masih terhubung — alarm suhu tetap terjaga.
+  // CATATAN TRADE-OFF: Expo (tanpa native module tambahan) tidak punya
+  // foreground service generik selain lewat expo-location, jadi GPS akan
+  // ikut menyala di background selama modul BLE konek (bukan cuma pas
+  // record). Frekuensi GPS dibuat lebih jarang saat alarm-only supaya
+  // tidak seboros mode recording penuh.
+  // =========================================================
+  const updateBackgroundServiceState = async (
+    connected: boolean,
+    recording: boolean,
+  ) => {
+    if (!bgPermissionsGranted) return; // tanpa izin lokasi background, tidak bisa jalan sama sekali
+
+    const shouldBeActive = connected || recording;
+
+    if (shouldBeActive) {
+      try {
+        await ExpoLocation.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+          accuracy: ExpoLocation.Accuracy.High,
+          timeInterval: recording ? 2000 : 5000,
+          distanceInterval: recording ? 1 : 15,
+          // Ini yang bikin notifikasi melayang anti-kill muncul!
+          foregroundService: {
+            notificationTitle: "LivinaProDash Aktif",
+            notificationBody: recording
+              ? "Merekam telemetri & koordinat GPS di latar belakang..."
+              : "Memantau sensor mesin & alarm suhu di latar belakang...",
+            notificationColor: "#00ffcc",
+          },
+        });
+      } catch (err) {
+        console.log("[BG SERVICE] Gagal mengaktifkan:", err);
+      }
+    } else {
+      try {
+        await ExpoLocation.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+      } catch (err) {
+        // Sudah tidak aktif / abaikan
+      }
+    }
+  };
+
+  useEffect(() => {
+    updateBackgroundServiceState(isConnected, isRecording);
+  }, [isConnected, isRecording, bgPermissionsGranted]);
+
   useEffect(() => {
     if (isConnected) {
       lastUpdateTime.current = Date.now();
@@ -641,6 +2025,12 @@ export default function useDashboard() {
       );
     }
   }, [isConnected, isRecording, isBypassed]);
+
+  useEffect(() => {
+    return () => {
+      stopAlarmSound();
+    };
+  }, []);
 
   const handleConnectToModule = async () => {
     const hasPermission = await requestPermissions();
@@ -855,6 +2245,73 @@ export default function useDashboard() {
     await AsyncStorage.setItem("@hud_mirror", next ? "1" : "0");
   };
 
+  const setTempAlarmEnabled = async (val: boolean) => {
+    setTempAlarmEnabledState(val);
+    tempAlarmEnabledRef.current = val;
+    await AsyncStorage.setItem("@temp_alarm_enabled", val ? "1" : "0");
+    if (!val) {
+      isOverheatingRef.current = false;
+      setIsOverheating(false);
+      Vibration.cancel();
+      stopAlarmSound();
+    }
+  };
+
+  const setTempAlarmThreshold = async (val: string) => {
+    setTempAlarmThresholdState(val);
+    const parsed = parseInt(val);
+    if (!isNaN(parsed)) tempAlarmThresholdRef.current = parsed;
+    await AsyncStorage.setItem("@temp_alarm_threshold", val);
+  };
+
+  const testTempAlarm = async () => {
+    const threshold = tempAlarmThresholdRef.current;
+    Vibration.vibrate([0, 400, 200, 400]);
+    try {
+      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+      const { sound } = await Audio.Sound.createAsync(resolveAlarmSource());
+      await sound.playAsync();
+      setTimeout(() => sound.unloadAsync(), 3000);
+    } catch (e) {
+      console.log("[TEST ALARM] Gagal memutar suara:", e);
+    }
+    showAlert(
+      "⚠️ SUHU MESIN TINGGI! (TEST)",
+      `Ini simulasi alarm. Threshold saat ini: ${threshold}°C.`,
+      "error",
+    );
+  };
+
+  const playAlarmSound = async () => {
+    try {
+      if (alarmSoundRef.current) {
+        await alarmSoundRef.current.replayAsync();
+        return;
+      }
+      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+      const { sound } = await Audio.Sound.createAsync(resolveAlarmSource(), {
+        isLooping: true,
+        volume: 1.0,
+      });
+      alarmSoundRef.current = sound;
+      await sound.playAsync();
+    } catch (e) {
+      console.log("[TEMP ALARM] Gagal memutar suara alarm:", e);
+    }
+  };
+
+  const stopAlarmSound = async () => {
+    try {
+      if (alarmSoundRef.current) {
+        await alarmSoundRef.current.stopAsync();
+        await alarmSoundRef.current.unloadAsync();
+        alarmSoundRef.current = null;
+      }
+    } catch (e) {
+      console.log("[TEMP ALARM] Gagal stop suara alarm:", e);
+    }
+  };
+
   const sendToTerminal = (cmd: string) => {
     if (!cmd.trim()) return;
     setTerminalLogs((prev) => [...prev, `$ ${cmd}`]);
@@ -869,6 +2326,140 @@ export default function useDashboard() {
       "--------------------------------",
     ]);
   };
+
+  const resolveAlarmSource = () => {
+    if (
+      alarmSoundIdRef.current === CUSTOM_SOUND_ID &&
+      customSoundUriRef.current
+    ) {
+      return { uri: customSoundUriRef.current };
+    }
+    const preset = ALARM_SOUND_PRESETS.find(
+      (p) => p.id === alarmSoundIdRef.current,
+    );
+    return preset ? preset.source : ALARM_SOUND_PRESETS[0].source;
+  };
+
+  const setAlarmSoundId = async (id: string) => {
+    setAlarmSoundIdState(id);
+    alarmSoundIdRef.current = id;
+    await AsyncStorage.setItem("@temp_alarm_sound_id", id);
+  };
+
+  const pickCustomAlarmSound = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "audio/*",
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+
+      const picked = result.assets[0];
+      const destDir = FileSystem.documentDirectory + "alarm_sounds/";
+      await FileSystem.makeDirectoryAsync(destDir, {
+        intermediates: true,
+      }).catch(() => {});
+      const ext = picked.name.split(".").pop() || "mp3";
+      const destUri = destDir + "custom_alarm." + ext;
+
+      await FileSystem.copyAsync({ from: picked.uri, to: destUri });
+
+      customSoundUriRef.current = destUri;
+      setCustomSoundName(picked.name);
+      setAlarmSoundIdState(CUSTOM_SOUND_ID);
+      alarmSoundIdRef.current = CUSTOM_SOUND_ID;
+
+      await AsyncStorage.setItem("@temp_alarm_sound_id", CUSTOM_SOUND_ID);
+      await AsyncStorage.setItem("@temp_alarm_sound_uri", destUri);
+      await AsyncStorage.setItem("@temp_alarm_sound_name", picked.name);
+
+      showAlert(
+        "Tersimpan",
+        `Suara alarm kustom "${picked.name}" berhasil dipasang.`,
+        "success",
+      );
+    } catch (e) {
+      console.log("[TEMP ALARM] Gagal memilih file suara:", e);
+      showAlert("Gagal", "Tidak bisa memuat file suara yang dipilih.", "error");
+    }
+  };
+
+  const previewAlarmSound = async (id: string) => {
+    try {
+      if (previewSoundRef.current) {
+        await previewSoundRef.current.stopAsync();
+        await previewSoundRef.current.unloadAsync();
+        previewSoundRef.current = null;
+      }
+      const preset = ALARM_SOUND_PRESETS.find((p) => p.id === id);
+      if (!preset) return;
+      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+      const { sound } = await Audio.Sound.createAsync(preset.source);
+      previewSoundRef.current = sound;
+      await sound.playAsync();
+      setTimeout(async () => {
+        if (previewSoundRef.current === sound) {
+          await sound.unloadAsync();
+          previewSoundRef.current = null;
+        }
+      }, 2500);
+    } catch (e) {
+      console.log("[TEMP ALARM] Gagal preview suara:", e);
+    }
+  };
+
+  const simulateTempRamp = () => {
+    if (tempSimIntervalRef.current) {
+      clearInterval(tempSimIntervalRef.current);
+      tempSimIntervalRef.current = null;
+      setIsSimulatingTemp(false);
+      return;
+    }
+
+    const threshold = tempAlarmThresholdRef.current;
+    const startTemp = threshold - 20;
+    const peakTemp = threshold + 10;
+    let currentSimTemp = startTemp;
+    let direction: "up" | "down" = "up";
+
+    setIsSimulatingTemp(true);
+    showAlert(
+      "🧪 Simulasi Dimulai",
+      `Suhu akan naik dari ${startTemp}°C, tembus threshold ${threshold}°C, lalu turun pelan. Alarm baru berhenti setelah suhu ≤ ${threshold - TEMP_ALARM_HYSTERESIS}°C (bukan langsung pas balik ke ${threshold}°C).`,
+      "success",
+    );
+
+    tempSimIntervalRef.current = setInterval(() => {
+      if (direction === "up") {
+        currentSimTemp += 1;
+        if (currentSimTemp >= peakTemp) direction = "down";
+      } else {
+        currentSimTemp -= 1;
+        if (currentSimTemp <= startTemp) {
+          // Selesai satu siklus penuh, hentikan otomatis
+          clearInterval(tempSimIntervalRef.current!);
+          tempSimIntervalRef.current = null;
+          setIsSimulatingTemp(false);
+          showAlert(
+            "🧪 Simulasi Selesai",
+            "Satu siklus naik-turun selesai.",
+            "success",
+          );
+          return;
+        }
+      }
+
+      // Panggil updateData ASLI dengan data palsu, field lain tetap
+      // dari data terakhir supaya gauge lain tidak ikut kacau.
+      updateData({ ...data, t: currentSimTemp });
+    }, 400); // 1°C tiap 400ms — cukup lambat buat diamati manual
+  };
+
+  useEffect(() => {
+    return () => {
+      if (tempSimIntervalRef.current) clearInterval(tempSimIntervalRef.current);
+    };
+  }, []);
 
   return {
     state: {
@@ -910,6 +2501,12 @@ export default function useDashboard() {
       terminalLogs,
       showSaveTripModal,
       hudMirrorEnabled,
+      tempAlarmEnabled,
+      tempAlarmThreshold,
+      isOverheating,
+      alarmSoundId,
+      customSoundName,
+      isSimulatingTemp,
     },
     actions: {
       setOtaSsid,
@@ -949,6 +2546,13 @@ export default function useDashboard() {
       confirmSaveTrip,
       discardTrip,
       toggleHudMirror,
+      setTempAlarmEnabled,
+      setTempAlarmThreshold,
+      testTempAlarm,
+      setAlarmSoundId,
+      pickCustomAlarmSound,
+      previewAlarmSound,
+      simulateTempRamp,
     },
   };
 }
